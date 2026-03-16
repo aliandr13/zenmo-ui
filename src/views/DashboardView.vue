@@ -24,7 +24,6 @@ onMounted(async () => {
   }
 })
 
-const creditCards = () => accounts.value.filter((a) => a.type === 'CREDIT_CARD')
 </script>
 
 <template>
@@ -39,7 +38,7 @@ const creditCards = () => accounts.value.filter((a) => a.type === 'CREDIT_CARD')
         <h2>Accounts</h2>
         <ul v-if="accounts.length" class="account-list">
           <li v-for="a in accounts" :key="a.id">
-            <strong>{{ a.name }}</strong> — {{ a.type }} ({{ a.currency }})<template v-if="a.creditLimit != null"> — limit {{ a.creditLimit }}</template>
+            <strong>{{ a.name }}</strong> — {{ a.type }} ({{ a.currency }})<template v-if="a.creditLimit != null"> — limit {{ a.creditLimit }}</template><template v-if="a.type === 'CREDIT_CARD' && (a.paymentDueDay != null || a.closingDay != null)"> — </template><template v-if="a.type === 'CREDIT_CARD' && a.paymentDueDay != null">due day {{ a.paymentDueDay }}</template><template v-if="a.type === 'CREDIT_CARD' && a.paymentDueDay != null && a.closingDay != null">, </template><template v-if="a.type === 'CREDIT_CARD' && a.closingDay != null">closes day {{ a.closingDay }}</template>
           </li>
         </ul>
         <p v-else>No accounts yet. <router-link to="/accounts">Add one</router-link>.</p>

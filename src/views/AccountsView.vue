@@ -12,6 +12,8 @@ const form = ref({
   type: 'CHECKING' as AccountType,
   currency: 'USD',
   creditLimit: undefined as number | undefined,
+  paymentDueDay: undefined as number | undefined,
+  closingDay: 1,
 })
 const submitting = ref(false)
 const deleteId = ref<string | null>(null)
@@ -31,6 +33,13 @@ async function load() {
 onMounted(load)
 
 async function submitAccount() {
+  if (form.value.type === 'CREDIT_CARD') {
+    const d = form.value.closingDay
+    if (d == null || d < 1 || d > 31) {
+      error.value = 'Closing day must be between 1 and 31'
+      return
+    }
+  }
   submitting.value = true
   error.value = ''
   try {
@@ -39,8 +48,10 @@ async function submitAccount() {
       type: form.value.type,
       currency: form.value.currency,
       creditLimit: form.value.creditLimit,
+      paymentDueDay: form.value.type === 'CREDIT_CARD' ? form.value.paymentDueDay : undefined,
+      closingDay: form.value.closingDay ?? 1,
     })
-    form.value = { name: '', type: 'CHECKING', currency: 'USD', creditLimit: undefined }
+    form.value = { name: '', type: 'CHECKING', currency: 'USD', creditLimit: undefined, paymentDueDay: undefined, closingDay: 1 }
     showForm.value = false
     await load()
   } catch (e) {
@@ -91,6 +102,14 @@ async function remove(id: string) {
         <label>Credit limit (optional)</label>
         <input v-model.number="form.creditLimit" type="number" step="0.01" />
       </div>
+      <div class="field" v-if="form.type === 'CREDIT_CARD'">
+        <label>Payment due day (1–31, optional)</label>
+        <input v-model.number="form.paymentDueDay" type="number" min="1" max="31" placeholder="e.g. 15" />
+      </div>
+      <div class="field" v-if="form.type === 'CREDIT_CARD'">
+        <label>Closing day (1–31) *</label>
+        <input v-model.number="form.closingDay" type="number" min="1" max="31" required />
+      </div>
       <div class="actions">
         <button type="submit" :disabled="submitting">{{ submitting ? 'Saving…' : 'Save' }}</button>
         <button type="button" @click="showForm = false">Cancel</button>
@@ -99,7 +118,9 @@ async function remove(id: string) {
 
     <ul v-if="accounts.length" class="list">
       <li v-for="a in accounts" :key="a.id" class="row">
-        <span><strong>{{ a.name }}</strong> — {{ a.type }} — {{ a.currency }}<template v-if="a.creditLimit != null"> — limit {{ a.creditLimit }}</template></span>
+        <span>
+          <strong>{{ a.name }}</strong> — {{ a.type }} — {{ a.currency }}<template v-if="a.creditLimit != null"> — limit {{ a.creditLimit }}</template><template v-if="a.type === 'CREDIT_CARD' && (a.paymentDueDay != null || a.closingDay != null)"> — </template><template v-if="a.type === 'CREDIT_CARD' && a.paymentDueDay != null">due day {{ a.paymentDueDay }}</template><template v-if="a.type === 'CREDIT_CARD' && a.paymentDueDay != null && a.closingDay != null">, </template><template v-if="a.type === 'CREDIT_CARD' && a.closingDay != null">closes day {{ a.closingDay }}</template>
+        </span>
         <button type="button" class="btn-sm danger" :disabled="deleteId === a.id" @click="remove(a.id)">{{ deleteId === a.id ? '…' : 'Delete' }}</button>
       </li>
     </ul>

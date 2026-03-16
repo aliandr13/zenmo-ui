@@ -32,6 +32,8 @@ export interface AccountRequest {
   type: AccountType
   currency: string
   creditLimit?: number
+  paymentDueDay?: number
+  closingDay: number
 }
 
 export interface AccountResponse {
@@ -40,6 +42,8 @@ export interface AccountResponse {
   type: AccountType
   currency: string
   creditLimit?: number
+  paymentDueDay?: number
+  closingDay: number
   archived: boolean
   createdAt: string
 }
