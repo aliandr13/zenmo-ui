@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { BModalOrchestrator, BToastOrchestrator, BPopoverOrchestrator } from 'bootstrap-vue-next'
 </script>
 
 <template>
+  <BModalOrchestrator />
+  <BToastOrchestrator />
+  <BPopoverOrchestrator />
   <router-view />
 </template>
 
@@ -11,8 +15,7 @@
 }
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, sans-serif;
-  background: #f5f5f5;
+  font-family: var(--bs-body-font-family), system-ui, -apple-system, sans-serif;
 }
 #app {
   min-height: 100vh;

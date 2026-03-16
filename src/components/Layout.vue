@@ -1,27 +1,75 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { RouterLink } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useThemeStore } from '@/stores/theme'
+import {
+  BNavbar,
+  BNavbarBrand,
+  BNavbarToggle,
+  BNavbarNav,
+  BCollapse,
+  BDropdown,
+  BDropdownItem,
+  BButton,
+} from 'bootstrap-vue-next'
 
 const router = useRouter()
 const auth = useAuthStore()
+const themeStore = useThemeStore()
 
 function logout() {
   auth.logout()
   router.push({ name: 'Login' })
 }
+
+function setTheme(mode: 'light' | 'dark' | 'system') {
+  themeStore.setMode(mode)
+}
 </script>
 
 <template>
   <div class="layout">
-    <nav class="nav">
-      <router-link to="/" class="brand">Zenmo</router-link>
-      <router-link to="/">Dashboard</router-link>
-      <router-link to="/accounts">Accounts</router-link>
-      <router-link to="/transactions">Transactions</router-link>
-      <router-link to="/categories">Categories</router-link>
-      <button type="button" class="logout" @click="logout">Logout</button>
-    </nav>
-    <main class="main">
+    <BNavbar variant="dark" toggleable="lg" class="navbar-dark">
+      <BNavbarBrand :to="{ name: 'Dashboard' }">Zenmo</BNavbarBrand>
+      <BNavbarToggle target="nav-collapse" />
+      <BCollapse id="nav-collapse" is-nav>
+        <BNavbarNav>
+          <li class="nav-item">
+            <RouterLink to="/" class="nav-link" active-class="active">Dashboard</RouterLink>
+          </li>
+          <li class="nav-item">
+            <RouterLink to="/accounts" class="nav-link" active-class="active">Accounts</RouterLink>
+          </li>
+          <li class="nav-item">
+            <RouterLink to="/transactions" class="nav-link" active-class="active">Transactions</RouterLink>
+          </li>
+          <li class="nav-item">
+            <RouterLink to="/categories" class="nav-link" active-class="active">Categories</RouterLink>
+          </li>
+        </BNavbarNav>
+        <BNavbarNav class="ms-auto mb-2 mb-lg-0">
+          <BDropdown
+            :text="themeStore.mode === 'system' ? 'Theme (System)' : `Theme (${themeStore.mode})`"
+            variant="outline-light"
+            size="sm"
+            class="me-2"
+          >
+            <BDropdownItem :active="themeStore.mode === 'light'" @click="setTheme('light')">
+              Light
+            </BDropdownItem>
+            <BDropdownItem :active="themeStore.mode === 'dark'" @click="setTheme('dark')">
+              Dark
+            </BDropdownItem>
+            <BDropdownItem :active="themeStore.mode === 'system'" @click="setTheme('system')">
+              System
+            </BDropdownItem>
+          </BDropdown>
+          <BButton variant="outline-light" size="sm" @click="logout">Logout</BButton>
+        </BNavbarNav>
+      </BCollapse>
+    </BNavbar>
+    <main class="main container py-4">
       <router-view />
     </main>
   </div>
@@ -33,43 +81,14 @@ function logout() {
   display: flex;
   flex-direction: column;
 }
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-  background: #1a1a2e;
-  color: #eee;
-}
-.nav a {
-  color: #eee;
-  text-decoration: none;
-}
-.nav a.router-link-active {
-  font-weight: 600;
-  color: #fff;
-}
-.brand {
-  font-weight: 700;
-  margin-right: 0.5rem;
-}
-.logout {
-  margin-left: auto;
-  padding: 0.35rem 0.75rem;
-  background: #333;
-  border: 1px solid #555;
-  color: #eee;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.logout:hover {
-  background: #444;
+.navbar-dark {
+  background-color: var(--bs-dark);
 }
 .main {
   flex: 1;
-  padding: 1.5rem;
   max-width: 960px;
-  margin: 0 auto;
+  margin-left: auto;
+  margin-right: auto;
   width: 100%;
 }
 </style>
