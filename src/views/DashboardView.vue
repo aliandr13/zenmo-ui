@@ -1,13 +1,37 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { listAccounts } from '@/api/accounts'
+import { RouterLink } from 'vue-router'
+import { listAccounts, deleteAccount } from '@/api/accounts'
 import { listTransactions } from '@/api/transactions'
 import type { AccountResponse, TxnResponse } from '@/types/api'
+import {
+  amountCell,
+  closingCell,
+  dueCell,
+  limitCell,
+  typeLabel,
+} from '@/composables/useAccountTableFormatters'
+import { BAlert, BButton } from 'bootstrap-vue-next'
 
 const accounts = ref<AccountResponse[]>([])
 const recentTxns = ref<TxnResponse[]>([])
 const loading = ref(true)
 const error = ref('')
+const deleteId = ref<string | null>(null)
+
+async function removeAccount(id: string) {
+  if (!confirm('Delete this account?')) return
+  deleteId.value = id
+  error.value = ''
+  try {
+    await deleteAccount(id)
+    accounts.value = accounts.value.filter((x) => x.id !== id)
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : 'Failed to delete'
+  } finally {
+    deleteId.value = null
+  }
+}
 
 onMounted(async () => {
   try {
@@ -23,65 +47,91 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
 </script>
 
 <template>
   <div class="dashboard">
-    <h1>Dashboard</h1>
-    <p v-if="error" class="error">{{ error }}</p>
-    <template v-else-if="loading">
-      <p>Loading…</p>
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pb-2 mb-3 border-bottom">
+      <h1 class="h2">Dashboard</h1>
+    </div>
+
+    <BAlert v-if="error" variant="danger" class="mb-3" show>{{ error }}</BAlert>
+
+    <template v-if="loading">
+      <p class="text-muted">Loading…</p>
     </template>
     <template v-else>
-      <section class="summary">
-        <h2>Accounts</h2>
-        <ul v-if="accounts.length" class="account-list">
-          <li v-for="a in accounts" :key="a.id">
-            <strong>{{ a.name }}</strong> — {{ a.type }} ({{ a.currency }})<template v-if="a.creditLimit != null"> — limit {{ a.creditLimit }}</template><template v-if="a.type === 'CREDIT_CARD' && (a.paymentDueDay != null || a.closingDay != null)"> — </template><template v-if="a.type === 'CREDIT_CARD' && a.paymentDueDay != null">due day {{ a.paymentDueDay }}</template><template v-if="a.type === 'CREDIT_CARD' && a.paymentDueDay != null && a.closingDay != null">, </template><template v-if="a.type === 'CREDIT_CARD' && a.closingDay != null">closes day {{ a.closingDay }}</template>
-          </li>
-        </ul>
-        <p v-else>No accounts yet. <router-link to="/accounts">Add one</router-link>.</p>
+      <section class="mb-4">
+        <h2 class="h4">Accounts</h2>
+        <div v-if="accounts.length" class="table-responsive">
+          <table class="table table-striped table-sm table-hover align-middle">
+            <thead>
+              <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Type</th>
+                <th scope="col" class="text-end">Amount</th>
+                <th scope="col" class="text-end">Limit</th>
+                <th scope="col">Due</th>
+                <th scope="col">Closing</th>
+                <th scope="col" class="text-end">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in accounts" :key="a.id">
+                <td>{{ a.name }}</td>
+                <td>{{ typeLabel(a.type) }}</td>
+                <td class="text-end text-muted">{{ amountCell(a) }}</td>
+                <td class="text-end">{{ limitCell(a) }}</td>
+                <td>{{ dueCell(a) }}</td>
+                <td>{{ closingCell(a) }}</td>
+                <td class="text-end text-nowrap">
+                  <RouterLink
+                    :to="{ name: 'Accounts' }"
+                    class="btn btn-sm btn-outline-secondary me-1"
+                  >
+                    Edit
+                  </RouterLink>
+                  <BButton
+                    variant="outline-danger"
+                    size="sm"
+                    :disabled="deleteId === a.id"
+                    @click="removeAccount(a.id)"
+                  >
+                    {{ deleteId === a.id ? '…' : 'Delete' }}
+                  </BButton>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="text-muted">
+          No accounts yet.
+          <RouterLink to="/accounts" class="link-secondary">Add one</RouterLink>.
+        </p>
       </section>
+
       <section>
-        <h2>Recent transactions</h2>
-        <ul v-if="recentTxns.length" class="txn-list">
-          <li v-for="t in recentTxns" :key="t.id">
+        <h2 class="h4">Recent transactions</h2>
+        <ul v-if="recentTxns.length" class="list-unstyled mb-0">
+          <li
+            v-for="t in recentTxns"
+            :key="t.id"
+            class="py-2 border-bottom"
+          >
             {{ t.transactionDate }} — {{ t.description }} — {{ t.amount }} {{ t.currency }}
           </li>
         </ul>
-        <p v-else>No transactions. <router-link to="/transactions">Add one</router-link>.</p>
+        <p v-else class="text-muted">
+          No transactions.
+          <RouterLink to="/transactions" class="link-secondary">Add one</RouterLink>.
+        </p>
       </section>
     </template>
   </div>
 </template>
 
 <style scoped>
-.dashboard h1 {
-  margin-bottom: 1rem;
-}
-.summary,
-section {
-  margin-bottom: 1.5rem;
-}
-.summary h2,
-section h2 {
-  font-size: 1rem;
-  margin-bottom: 0.5rem;
-  color: #555;
-}
-.account-list,
-.txn-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-}
-.account-list li,
-.txn-list li {
-  padding: 0.35rem 0;
-  border-bottom: 1px solid #eee;
-}
-.error {
-  color: #c00;
+.dashboard {
+  width: 100%;
 }
 </style>
