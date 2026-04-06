@@ -53,7 +53,7 @@ async function submit() {
           minlength="8"
         />
       </BFormGroup>
-      <BAlert v-if="error" variant="danger" class="mb-3" show>{{ error }}</BAlert>
+      <BAlert v-if="error" :model-value="true" variant="danger" class="mb-3">{{ error }}</BAlert>
       <BButton type="submit" variant="primary" class="w-100" :disabled="loading">
         {{ loading ? 'Creating account…' : 'Create account' }}
       </BButton>

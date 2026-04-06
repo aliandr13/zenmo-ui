@@ -56,7 +56,7 @@ onMounted(async () => {
       <h1 class="h2">Dashboard</h1>
     </div>
 
-    <BAlert v-if="error" variant="danger" class="mb-3" show>{{ error }}</BAlert>
+    <BAlert v-if="error" :model-value="true" variant="danger" class="mb-3">{{ error }}</BAlert>
 
     <template v-if="loading">
       <p class="text-muted">Loading…</p>

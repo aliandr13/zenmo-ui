@@ -1,8 +1,18 @@
 import type { AccountResponse, AccountType } from '@/types/api'
 
 export function typeLabel(t: AccountType): string {
-  if (t === 'SAVING') return 'Saving'
-  return t === 'CREDIT_CARD' ? 'Credit' : 'Debit'
+  switch (t) {
+    case 'CHECKING':
+      return 'Checking'
+    case 'CASH':
+      return 'Cash'
+    case 'SAVINGS':
+      return 'Savings'
+    case 'CREDIT':
+      return 'Credit'
+    default:
+      return t
+  }
 }
 
 export function formatMoney(value: number | undefined, currency: string): string {
@@ -23,7 +33,7 @@ export function statementBalanceCell(a: AccountResponse): string {
 }
 
 export function limitCell(a: AccountResponse): string {
-  if (a.type !== 'CREDIT_CARD' || a.creditLimit == null) return '—'
+  if (a.type !== 'CREDIT' || a.creditLimit == null) return '—'
   return formatMoney(a.creditLimit, a.currency)
 }
 
@@ -72,11 +82,11 @@ function formatNextDayOfMonth(dayOfMonth: number): string {
 }
 
 export function dueCell(a: AccountResponse): string {
-  if (a.type !== 'CREDIT_CARD' || a.paymentDueDay == null) return '—'
+  if (a.type !== 'CREDIT' || a.paymentDueDay == null) return '—'
   return formatNextDayOfMonth(a.paymentDueDay)
 }
 
 export function closingCell(a: AccountResponse): string {
-  if (a.type !== 'CREDIT_CARD') return '—'
+  if (a.type !== 'CREDIT') return '—'
   return formatNextDayOfMonth(a.closingDay)
 }

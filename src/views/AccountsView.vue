@@ -12,19 +12,23 @@ import {
 } from '@/composables/useAccountTableFormatters'
 import { BAlert, BButton, BForm, BFormGroup, BFormInput } from 'bootstrap-vue-next'
 
+function newAccountForm() {
+  return {
+    name: '',
+    type: 'CREDIT' as AccountType,
+    currency: 'USD',
+    creditLimit: undefined as number | undefined,
+    paymentDueDay: undefined as number | undefined,
+    closingDay: 1,
+    currentBalance: 0,
+  }
+}
+
 const accounts = ref<AccountResponse[]>([])
 const loading = ref(true)
 const error = ref('')
 const showForm = ref(false)
-const form = ref({
-  name: '',
-  type: 'CHECKING' as AccountType,
-  currency: 'USD',
-  creditLimit: undefined as number | undefined,
-  paymentDueDay: undefined as number | undefined,
-  closingDay: 1,
-  currentBalance: undefined as number | undefined,
-})
+const form = ref(newAccountForm())
 const submitting = ref(false)
 const deleteId = ref<string | null>(null)
 
@@ -43,13 +47,30 @@ async function load() {
 onMounted(load)
 
 async function openAddForm() {
+  form.value = newAccountForm()
+  error.value = ''
   showForm.value = true
   await nextTick()
   document.getElementById('account-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function submitAccount() {
-  if (form.value.type === 'CREDIT_CARD') {
+  const bal = form.value.currentBalance
+  if (bal == null || Number.isNaN(bal)) {
+    error.value = 'Current balance is required'
+    return
+  }
+  if (form.value.type === 'CREDIT') {
+    const lim = form.value.creditLimit
+    if (lim == null || Number.isNaN(lim)) {
+      error.value = 'Credit limit is required'
+      return
+    }
+    const due = form.value.paymentDueDay
+    if (due == null || Number.isNaN(due) || due < 1 || due > 31) {
+      error.value = 'Payment due day must be between 1 and 31'
+      return
+    }
     const d = form.value.closingDay
     if (d == null || d < 1 || d > 31) {
       error.value = 'Closing day must be between 1 and 31'
@@ -59,25 +80,16 @@ async function submitAccount() {
   submitting.value = true
   error.value = ''
   try {
-    const bal = form.value.currentBalance
     await createAccount({
       name: form.value.name,
       type: form.value.type,
       currency: form.value.currency,
-      creditLimit: form.value.creditLimit,
-      paymentDueDay: form.value.type === 'CREDIT_CARD' ? form.value.paymentDueDay : undefined,
+      creditLimit: form.value.type === 'CREDIT' ? form.value.creditLimit : undefined,
+      paymentDueDay: form.value.type === 'CREDIT' ? form.value.paymentDueDay : undefined,
       closingDay: form.value.closingDay ?? 1,
-      ...(bal != null && !Number.isNaN(bal) ? { currentBalance: bal } : {}),
+      currentBalance: bal,
     })
-    form.value = {
-      name: '',
-      type: 'CHECKING',
-      currency: 'USD',
-      creditLimit: undefined,
-      paymentDueDay: undefined,
-      closingDay: 1,
-      currentBalance: undefined,
-    }
+    form.value = newAccountForm()
     showForm.value = false
     await load()
   } catch (e) {
@@ -109,7 +121,7 @@ async function removeAccount(id: string) {
       <BButton variant="primary" @click="openAddForm">Add account</BButton>
     </div>
 
-    <BAlert v-if="error" variant="danger" class="mb-3" show>{{ error }}</BAlert>
+    <BAlert v-if="error" :model-value="true" variant="danger" class="mb-3">{{ error }}</BAlert>
 
     <template v-if="loading">
       <p class="text-muted">Loading…</p>
@@ -178,27 +190,28 @@ async function removeAccount(id: string) {
             </BFormGroup>
             <BFormGroup label="Type" label-for="acc-type" class="mb-3">
               <select id="acc-type" v-model="form.type" class="form-select" required>
+                <option value="CREDIT">Credit</option>
                 <option value="CHECKING">Checking</option>
                 <option value="CASH">Cash</option>
-                <option value="SAVING">Saving</option>
-                <option value="CREDIT_CARD">Credit</option>
+                <option value="SAVINGS">Savings</option>
               </select>
             </BFormGroup>
             <BFormGroup label="Currency (3 letters)" label-for="acc-currency" class="mb-3">
               <BFormInput id="acc-currency" v-model="form.currency" maxlength="3" required />
             </BFormGroup>
-            <BFormGroup label="Current balance (optional)" label-for="acc-balance" class="mb-3">
+            <BFormGroup label="Current balance *" label-for="acc-balance" class="mb-3">
               <input
                 id="acc-balance"
                 v-model.number="form.currentBalance"
                 type="number"
                 step="0.01"
+                required
                 class="form-control"
               />
             </BFormGroup>
             <BFormGroup
-              v-if="form.type === 'CREDIT_CARD'"
-              label="Credit limit (optional)"
+              v-if="form.type === 'CREDIT'"
+              label="Credit limit *"
               label-for="acc-limit"
               class="mb-3"
             >
@@ -207,12 +220,13 @@ async function removeAccount(id: string) {
                 v-model.number="form.creditLimit"
                 type="number"
                 step="0.01"
+                required
                 class="form-control"
               />
             </BFormGroup>
             <BFormGroup
-              v-if="form.type === 'CREDIT_CARD'"
-              label="Payment due day (1–31, optional)"
+              v-if="form.type === 'CREDIT'"
+              label="Payment due date (day 1–31) *"
               label-for="acc-due"
               class="mb-3"
             >
@@ -222,12 +236,13 @@ async function removeAccount(id: string) {
                 type="number"
                 min="1"
                 max="31"
+                required
                 placeholder="e.g. 15"
                 class="form-control"
               />
             </BFormGroup>
             <BFormGroup
-              v-if="form.type === 'CREDIT_CARD'"
+              v-if="form.type === 'CREDIT'"
               label="Closing day (1–31) *"
               label-for="acc-closing"
               class="mb-3"

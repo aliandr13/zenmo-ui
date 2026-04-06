@@ -85,13 +85,18 @@ export async function apiJson<T>(path: string, init: RequestInitWithAuth = {}): 
   }
   const text = await res.text()
   if (!res.ok) {
-    let err: { message?: string } = {}
+    let err: { message?: string; detail?: string; title?: string; error?: string } = {}
     try {
       if (text) err = JSON.parse(text)
     } catch {
       /* ignore */
     }
-    throw new Error(err.message || text || `HTTP ${res.status}`)
+    const apiMsg =
+      err.message ||
+      err.detail ||
+      err.title ||
+      (typeof err.error === 'string' ? err.error : undefined)
+    throw new Error(apiMsg || text || `HTTP ${res.status}`)
   }
   return text ? JSON.parse(text) : (null as T)
 }

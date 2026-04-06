@@ -1,5 +1,5 @@
 
-export type AccountType = 'CHECKING' | 'CASH' | 'SAVING' | 'CREDIT_CARD'
+export type AccountType = 'CHECKING' | 'CASH' | 'SAVINGS' | 'CREDIT'
 export type TxnStatus = 'PENDING' | 'POSTED'
 
 export interface RegisterRequest {
