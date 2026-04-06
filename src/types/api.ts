@@ -1,5 +1,5 @@
 
-export type AccountType = 'CHECKING' | 'CASH' | 'CREDIT_CARD'
+export type AccountType = 'CHECKING' | 'CASH' | 'SAVING' | 'CREDIT_CARD'
 export type TxnStatus = 'PENDING' | 'POSTED'
 
 export interface RegisterRequest {
@@ -33,6 +33,7 @@ export interface AccountRequest {
   creditLimit?: number
   paymentDueDay?: number
   closingDay: number
+  currentBalance?: number
 }
 
 export interface AccountResponse {

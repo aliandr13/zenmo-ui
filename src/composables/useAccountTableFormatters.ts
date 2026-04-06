@@ -1,6 +1,7 @@
 import type { AccountResponse, AccountType } from '@/types/api'
 
 export function typeLabel(t: AccountType): string {
+  if (t === 'SAVING') return 'Saving'
   return t === 'CREDIT_CARD' ? 'Credit' : 'Debit'
 }
 

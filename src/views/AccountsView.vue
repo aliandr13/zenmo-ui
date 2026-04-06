@@ -23,6 +23,7 @@ const form = ref({
   creditLimit: undefined as number | undefined,
   paymentDueDay: undefined as number | undefined,
   closingDay: 1,
+  currentBalance: undefined as number | undefined,
 })
 const submitting = ref(false)
 const deleteId = ref<string | null>(null)
@@ -58,6 +59,7 @@ async function submitAccount() {
   submitting.value = true
   error.value = ''
   try {
+    const bal = form.value.currentBalance
     await createAccount({
       name: form.value.name,
       type: form.value.type,
@@ -65,8 +67,17 @@ async function submitAccount() {
       creditLimit: form.value.creditLimit,
       paymentDueDay: form.value.type === 'CREDIT_CARD' ? form.value.paymentDueDay : undefined,
       closingDay: form.value.closingDay ?? 1,
+      ...(bal != null && !Number.isNaN(bal) ? { currentBalance: bal } : {}),
     })
-    form.value = { name: '', type: 'CHECKING', currency: 'USD', creditLimit: undefined, paymentDueDay: undefined, closingDay: 1 }
+    form.value = {
+      name: '',
+      type: 'CHECKING',
+      currency: 'USD',
+      creditLimit: undefined,
+      paymentDueDay: undefined,
+      closingDay: 1,
+      currentBalance: undefined,
+    }
     showForm.value = false
     await load()
   } catch (e) {
@@ -169,11 +180,21 @@ async function removeAccount(id: string) {
               <select id="acc-type" v-model="form.type" class="form-select" required>
                 <option value="CHECKING">Checking</option>
                 <option value="CASH">Cash</option>
-                <option value="CREDIT_CARD">Credit card</option>
+                <option value="SAVING">Saving</option>
+                <option value="CREDIT_CARD">Credit</option>
               </select>
             </BFormGroup>
             <BFormGroup label="Currency (3 letters)" label-for="acc-currency" class="mb-3">
               <BFormInput id="acc-currency" v-model="form.currency" maxlength="3" required />
+            </BFormGroup>
+            <BFormGroup label="Current balance (optional)" label-for="acc-balance" class="mb-3">
+              <input
+                id="acc-balance"
+                v-model.number="form.currentBalance"
+                type="number"
+                step="0.01"
+                class="form-control"
+              />
             </BFormGroup>
             <BFormGroup
               v-if="form.type === 'CREDIT_CARD'"
