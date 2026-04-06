@@ -91,6 +91,18 @@ export function dueCell(a: AccountResponse): string {
   return formatNextDayOfMonth(a.paymentDueDay)
 }
 
+/** Days until next calendar occurrence of payment due day; null if N/A. Sort by this, not raw day-of-month. */
+export function daysUntilPaymentDue(a: AccountResponse): number | null {
+  if (a.type !== 'CREDIT' || a.paymentDueDay == null) return null
+  return nextDayOfMonthInfo(a.paymentDueDay).days
+}
+
+/** Days until next calendar occurrence of statement closing day; null if not credit. */
+export function daysUntilClosingDay(a: AccountResponse): number | null {
+  if (a.type !== 'CREDIT') return null
+  return nextDayOfMonthInfo(a.closingDay).days
+}
+
 /** Bootstrap text classes when payment is soon and there is a statement balance owed. */
 export function paymentDueUrgencyClass(a: AccountResponse): string {
   if (a.type !== 'CREDIT' || a.paymentDueDay == null) return ''

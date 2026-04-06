@@ -5,6 +5,8 @@ import type { AccountResponse, AccountType } from '@/types/api'
 import {
   closingCell,
   currentBalanceCell,
+  daysUntilClosingDay,
+  daysUntilPaymentDue,
   dueCell,
   limitCell,
   paymentDueUrgencyClass,
@@ -76,9 +78,9 @@ function sortCreditRows(list: AccountResponse[], key: CreditSortKey, dir: SortDi
       case 'creditLimit':
         return compareNullableNum(a.creditLimit, b.creditLimit, dir)
       case 'paymentDueDay':
-        return compareNullableNum(a.paymentDueDay, b.paymentDueDay, dir)
+        return compareNullableNum(daysUntilPaymentDue(a), daysUntilPaymentDue(b), dir)
       case 'closingDay':
-        return compareNullableNum(a.closingDay, b.closingDay, dir)
+        return compareNullableNum(daysUntilClosingDay(a), daysUntilClosingDay(b), dir)
       default:
         return 0
     }
