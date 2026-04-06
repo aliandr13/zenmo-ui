@@ -50,7 +50,7 @@ function calendarDaysBetweenUtc(
 }
 
 /** Next calendar occurrence of `dayOfMonth` (1–31): this month if today <= day, else next month. */
-function formatNextDayOfMonth(dayOfMonth: number): string {
+function nextDayOfMonthInfo(dayOfMonth: number): { days: number; dateStr: string } {
   const now = new Date()
   const todayY = now.getFullYear()
   const todayM = now.getMonth()
@@ -75,15 +75,31 @@ function formatNextDayOfMonth(dayOfMonth: number): string {
   const ty = targetDate.getFullYear()
   const tm = targetDate.getMonth()
   const td = targetDate.getDate()
-  const n = calendarDaysBetweenUtc(todayY, todayM, todayD, ty, tm, td)
+  const days = calendarDaysBetweenUtc(todayY, todayM, todayD, ty, tm, td)
 
-  if (n === 0) return `${dateStr} (today)`
-  return `${dateStr} (in ${n} day${n === 1 ? '' : 's'})`
+  return { days, dateStr }
+}
+
+function formatNextDayOfMonth(dayOfMonth: number): string {
+  const { days, dateStr } = nextDayOfMonthInfo(dayOfMonth)
+  if (days === 0) return `${dateStr} (today)`
+  return `${dateStr} (in ${days} day${days === 1 ? '' : 's'})`
 }
 
 export function dueCell(a: AccountResponse): string {
   if (a.type !== 'CREDIT' || a.paymentDueDay == null) return '—'
   return formatNextDayOfMonth(a.paymentDueDay)
+}
+
+/** Bootstrap text classes when payment is soon and there is a statement balance owed. */
+export function paymentDueUrgencyClass(a: AccountResponse): string {
+  if (a.type !== 'CREDIT' || a.paymentDueDay == null) return ''
+  const stmt = a.statementBalance
+  if (stmt == null || Number.isNaN(stmt) || stmt <= 0) return ''
+  const { days } = nextDayOfMonthInfo(a.paymentDueDay)
+  if (days < 2) return 'text-danger fw-semibold'
+  if (days < 7) return 'text-warning fw-semibold'
+  return ''
 }
 
 export function closingCell(a: AccountResponse): string {

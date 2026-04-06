@@ -31,6 +31,7 @@ export interface AccountRequest {
   type: AccountType
   currency: string
   creditLimit?: number
+  statementBalance?: number
   paymentDueDay?: number
   closingDay: number
   currentBalance?: number

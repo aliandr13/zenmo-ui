@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, nextTick } from 'vue'
-import { listAccounts, createAccount, deleteAccount } from '@/api/accounts'
+import { listAccounts, createAccount, updateAccount, deleteAccount } from '@/api/accounts'
 import type { AccountResponse, AccountType } from '@/types/api'
 import {
   closingCell,
   currentBalanceCell,
   dueCell,
   limitCell,
+  paymentDueUrgencyClass,
   statementBalanceCell,
 } from '@/composables/useAccountTableFormatters'
 import { BAlert, BButton, BForm, BFormGroup, BFormInput } from 'bootstrap-vue-next'
@@ -17,10 +18,86 @@ function newAccountForm() {
     type: 'CREDIT' as AccountType,
     currency: 'USD',
     creditLimit: undefined as number | undefined,
+    statementBalance: undefined as number | undefined,
     paymentDueDay: undefined as number | undefined,
     closingDay: 1,
     currentBalance: 0,
   }
+}
+
+function accountToForm(a: AccountResponse) {
+  const row = {
+    name: a.name,
+    type: a.type,
+    currency: a.currency,
+    closingDay: a.closingDay ?? 1,
+    currentBalance: a.currentBalance ?? 0,
+    creditLimit: undefined as number | undefined,
+    statementBalance: undefined as number | undefined,
+    paymentDueDay: undefined as number | undefined,
+  }
+  if (a.type === 'CREDIT') {
+    row.creditLimit = a.creditLimit
+    row.statementBalance = a.statementBalance
+    row.paymentDueDay = a.paymentDueDay
+  }
+  return row
+}
+
+type SortDir = 'asc' | 'desc'
+type CreditSortKey = 'name' | 'currentBalance' | 'statementBalance' | 'creditLimit' | 'paymentDueDay' | 'closingDay'
+type SimpleSortKey = 'name' | 'currentBalance'
+
+function compareNullableNum(
+  a: number | undefined | null,
+  b: number | undefined | null,
+  dir: SortDir,
+): number {
+  const na = a == null || Number.isNaN(Number(a)) ? null : Number(a)
+  const nb = b == null || Number.isNaN(Number(b)) ? null : Number(b)
+  if (na === null && nb === null) return 0
+  if (na === null) return 1
+  if (nb === null) return -1
+  const cmp = na - nb
+  return dir === 'asc' ? cmp : -cmp
+}
+
+function sortCreditRows(list: AccountResponse[], key: CreditSortKey, dir: SortDir): AccountResponse[] {
+  return [...list].sort((a, b) => {
+    switch (key) {
+      case 'name': {
+        const c = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+        return dir === 'asc' ? c : -c
+      }
+      case 'currentBalance':
+        return compareNullableNum(a.currentBalance, b.currentBalance, dir)
+      case 'statementBalance':
+        return compareNullableNum(a.statementBalance, b.statementBalance, dir)
+      case 'creditLimit':
+        return compareNullableNum(a.creditLimit, b.creditLimit, dir)
+      case 'paymentDueDay':
+        return compareNullableNum(a.paymentDueDay, b.paymentDueDay, dir)
+      case 'closingDay':
+        return compareNullableNum(a.closingDay, b.closingDay, dir)
+      default:
+        return 0
+    }
+  })
+}
+
+function sortSimpleRows(list: AccountResponse[], key: SimpleSortKey, dir: SortDir): AccountResponse[] {
+  return [...list].sort((a, b) => {
+    if (key === 'name') {
+      const c = a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+      return dir === 'asc' ? c : -c
+    }
+    return compareNullableNum(a.currentBalance, b.currentBalance, dir)
+  })
+}
+
+function ariaSortFor(activeKey: string, key: string, dir: SortDir): 'ascending' | 'descending' | undefined {
+  if (activeKey !== key) return undefined
+  return dir === 'asc' ? 'ascending' : 'descending'
 }
 
 const accounts = ref<AccountResponse[]>([])
@@ -29,9 +106,48 @@ const checkingAndCashAccounts = computed(() =>
   accounts.value.filter((a) => a.type === 'CHECKING' || a.type === 'CASH'),
 )
 const savingsAccounts = computed(() => accounts.value.filter((a) => a.type === 'SAVINGS'))
+
+const creditSort = ref<{ key: CreditSortKey; dir: SortDir }>({ key: 'name', dir: 'asc' })
+const checkingSort = ref<{ key: SimpleSortKey; dir: SortDir }>({ key: 'name', dir: 'asc' })
+const savingsSort = ref<{ key: SimpleSortKey; dir: SortDir }>({ key: 'name', dir: 'asc' })
+
+const sortedCreditAccounts = computed(() =>
+  sortCreditRows(creditAccounts.value, creditSort.value.key, creditSort.value.dir),
+)
+const sortedCheckingAndCashAccounts = computed(() =>
+  sortSimpleRows(checkingAndCashAccounts.value, checkingSort.value.key, checkingSort.value.dir),
+)
+const sortedSavingsAccounts = computed(() =>
+  sortSimpleRows(savingsAccounts.value, savingsSort.value.key, savingsSort.value.dir),
+)
+
+function toggleCreditSort(key: CreditSortKey) {
+  if (creditSort.value.key === key) {
+    creditSort.value = { key, dir: creditSort.value.dir === 'asc' ? 'desc' : 'asc' }
+  } else {
+    creditSort.value = { key, dir: 'asc' }
+  }
+}
+
+function toggleCheckingSort(key: SimpleSortKey) {
+  if (checkingSort.value.key === key) {
+    checkingSort.value = { key, dir: checkingSort.value.dir === 'asc' ? 'desc' : 'asc' }
+  } else {
+    checkingSort.value = { key, dir: 'asc' }
+  }
+}
+
+function toggleSavingsSort(key: SimpleSortKey) {
+  if (savingsSort.value.key === key) {
+    savingsSort.value = { key, dir: savingsSort.value.dir === 'asc' ? 'desc' : 'asc' }
+  } else {
+    savingsSort.value = { key, dir: 'asc' }
+  }
+}
 const loading = ref(true)
 const error = ref('')
 const showForm = ref(false)
+const editingAccountId = ref<string | null>(null)
 const form = ref(newAccountForm())
 const submitting = ref(false)
 const deleteId = ref<string | null>(null)
@@ -51,11 +167,26 @@ async function load() {
 onMounted(load)
 
 async function openAddForm() {
+  editingAccountId.value = null
   form.value = newAccountForm()
   error.value = ''
   showForm.value = true
   await nextTick()
   document.getElementById('account-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+async function openEditForm(a: AccountResponse) {
+  editingAccountId.value = a.id
+  form.value = accountToForm(a)
+  error.value = ''
+  showForm.value = true
+  await nextTick()
+  document.getElementById('account-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function closeAccountForm() {
+  showForm.value = false
+  editingAccountId.value = null
 }
 
 async function submitAccount() {
@@ -83,21 +214,37 @@ async function submitAccount() {
   }
   submitting.value = true
   error.value = ''
+  const stmt = form.value.type === 'CREDIT' ? form.value.statementBalance : undefined
+  const statementBalance =
+    form.value.type === 'CREDIT' &&
+    stmt != null &&
+    !Number.isNaN(stmt) &&
+    Number.isFinite(stmt)
+      ? stmt
+      : undefined
+  const payload = {
+    name: form.value.name,
+    type: form.value.type,
+    currency: form.value.currency,
+    creditLimit: form.value.type === 'CREDIT' ? form.value.creditLimit : undefined,
+    statementBalance,
+    paymentDueDay: form.value.type === 'CREDIT' ? form.value.paymentDueDay : undefined,
+    closingDay: form.value.closingDay ?? 1,
+    currentBalance: bal,
+  }
   try {
-    await createAccount({
-      name: form.value.name,
-      type: form.value.type,
-      currency: form.value.currency,
-      creditLimit: form.value.type === 'CREDIT' ? form.value.creditLimit : undefined,
-      paymentDueDay: form.value.type === 'CREDIT' ? form.value.paymentDueDay : undefined,
-      closingDay: form.value.closingDay ?? 1,
-      currentBalance: bal,
-    })
+    const id = editingAccountId.value
+    if (id) {
+      await updateAccount(id, payload)
+    } else {
+      await createAccount(payload)
+    }
     form.value = newAccountForm()
+    editingAccountId.value = null
     showForm.value = false
     await load()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Failed to create'
+    error.value = e instanceof Error ? e.message : 'Failed to save'
   } finally {
     submitting.value = false
   }
@@ -141,29 +288,104 @@ async function removeAccount(id: string) {
             <table class="table table-striped table-sm table-hover align-middle">
               <thead>
                 <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col" class="text-end">Current balance</th>
-                  <th scope="col" class="text-end">Statement balance</th>
-                  <th scope="col" class="text-end">Limit</th>
-                  <th scope="col">Payment due date</th>
-                  <th scope="col">Next closing date</th>
+                  <th
+                    scope="col"
+                    :aria-sort="ariaSortFor(creditSort.key, 'name', creditSort.dir)"
+                  >
+                    <button type="button" class="sortable-th" @click="toggleCreditSort('name')">
+                      Name
+                      <span v-if="creditSort.key === 'name'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    class="text-end"
+                    :aria-sort="ariaSortFor(creditSort.key, 'currentBalance', creditSort.dir)"
+                  >
+                    <button
+                      type="button"
+                      class="sortable-th justify-content-end"
+                      @click="toggleCreditSort('currentBalance')"
+                    >
+                      Current balance
+                      <span v-if="creditSort.key === 'currentBalance'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    class="text-end"
+                    :aria-sort="ariaSortFor(creditSort.key, 'statementBalance', creditSort.dir)"
+                  >
+                    <button
+                      type="button"
+                      class="sortable-th justify-content-end"
+                      @click="toggleCreditSort('statementBalance')"
+                    >
+                      Statement balance
+                      <span v-if="creditSort.key === 'statementBalance'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    class="text-end"
+                    :aria-sort="ariaSortFor(creditSort.key, 'creditLimit', creditSort.dir)"
+                  >
+                    <button
+                      type="button"
+                      class="sortable-th justify-content-end"
+                      @click="toggleCreditSort('creditLimit')"
+                    >
+                      Limit
+                      <span v-if="creditSort.key === 'creditLimit'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    :aria-sort="ariaSortFor(creditSort.key, 'paymentDueDay', creditSort.dir)"
+                  >
+                    <button type="button" class="sortable-th" @click="toggleCreditSort('paymentDueDay')">
+                      Payment due date
+                      <span v-if="creditSort.key === 'paymentDueDay'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    :aria-sort="ariaSortFor(creditSort.key, 'closingDay', creditSort.dir)"
+                  >
+                    <button type="button" class="sortable-th" @click="toggleCreditSort('closingDay')">
+                      Next closing date
+                      <span v-if="creditSort.key === 'closingDay'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
                   <th scope="col" class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in creditAccounts" :key="a.id">
+                <tr v-for="a in sortedCreditAccounts" :key="a.id">
                   <td>{{ a.name }}</td>
                   <td class="text-end">{{ currentBalanceCell(a) }}</td>
                   <td class="text-end">{{ statementBalanceCell(a) }}</td>
                   <td class="text-end">{{ limitCell(a) }}</td>
-                  <td>{{ dueCell(a) }}</td>
+                  <td :class="paymentDueUrgencyClass(a)">{{ dueCell(a) }}</td>
                   <td>{{ closingCell(a) }}</td>
                   <td class="text-end text-nowrap">
                     <BButton
                       variant="outline-secondary"
                       size="sm"
                       class="me-1"
-                      @click="openAddForm"
+                      @click="openEditForm(a)"
                     >
                       Edit
                     </BButton>
@@ -189,13 +411,38 @@ async function removeAccount(id: string) {
             <table class="table table-striped table-sm table-hover align-middle">
               <thead>
                 <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col" class="text-end">Current balance</th>
+                  <th
+                    scope="col"
+                    :aria-sort="ariaSortFor(checkingSort.key, 'name', checkingSort.dir)"
+                  >
+                    <button type="button" class="sortable-th" @click="toggleCheckingSort('name')">
+                      Name
+                      <span v-if="checkingSort.key === 'name'" class="sort-indicator" aria-hidden="true">
+                        {{ checkingSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    class="text-end"
+                    :aria-sort="ariaSortFor(checkingSort.key, 'currentBalance', checkingSort.dir)"
+                  >
+                    <button
+                      type="button"
+                      class="sortable-th justify-content-end"
+                      @click="toggleCheckingSort('currentBalance')"
+                    >
+                      Current balance
+                      <span v-if="checkingSort.key === 'currentBalance'" class="sort-indicator" aria-hidden="true">
+                        {{ checkingSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
                   <th scope="col" class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in checkingAndCashAccounts" :key="a.id">
+                <tr v-for="a in sortedCheckingAndCashAccounts" :key="a.id">
                   <td>{{ a.name }}</td>
                   <td class="text-end">{{ currentBalanceCell(a) }}</td>
                   <td class="text-end text-nowrap">
@@ -203,7 +450,7 @@ async function removeAccount(id: string) {
                       variant="outline-secondary"
                       size="sm"
                       class="me-1"
-                      @click="openAddForm"
+                      @click="openEditForm(a)"
                     >
                       Edit
                     </BButton>
@@ -229,13 +476,38 @@ async function removeAccount(id: string) {
             <table class="table table-striped table-sm table-hover align-middle">
               <thead>
                 <tr>
-                  <th scope="col">Name</th>
-                  <th scope="col" class="text-end">Current balance</th>
+                  <th
+                    scope="col"
+                    :aria-sort="ariaSortFor(savingsSort.key, 'name', savingsSort.dir)"
+                  >
+                    <button type="button" class="sortable-th" @click="toggleSavingsSort('name')">
+                      Name
+                      <span v-if="savingsSort.key === 'name'" class="sort-indicator" aria-hidden="true">
+                        {{ savingsSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
+                    class="text-end"
+                    :aria-sort="ariaSortFor(savingsSort.key, 'currentBalance', savingsSort.dir)"
+                  >
+                    <button
+                      type="button"
+                      class="sortable-th justify-content-end"
+                      @click="toggleSavingsSort('currentBalance')"
+                    >
+                      Current balance
+                      <span v-if="savingsSort.key === 'currentBalance'" class="sort-indicator" aria-hidden="true">
+                        {{ savingsSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
                   <th scope="col" class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in savingsAccounts" :key="a.id">
+                <tr v-for="a in sortedSavingsAccounts" :key="a.id">
                   <td>{{ a.name }}</td>
                   <td class="text-end">{{ currentBalanceCell(a) }}</td>
                   <td class="text-end text-nowrap">
@@ -243,7 +515,7 @@ async function removeAccount(id: string) {
                       variant="outline-secondary"
                       size="sm"
                       class="me-1"
-                      @click="openAddForm"
+                      @click="openEditForm(a)"
                     >
                       Edit
                     </BButton>
@@ -270,13 +542,19 @@ async function removeAccount(id: string) {
         class="card border mb-4"
       >
         <div class="card-body">
-          <h2 class="h5 card-title">New account</h2>
+          <h2 class="h5 card-title">{{ editingAccountId ? 'Edit account' : 'New account' }}</h2>
           <BForm @submit.prevent="submitAccount" class="account-form">
             <BFormGroup label="Name" label-for="acc-name" class="mb-3">
               <BFormInput id="acc-name" v-model="form.name" required />
             </BFormGroup>
             <BFormGroup label="Type" label-for="acc-type" class="mb-3">
-              <select id="acc-type" v-model="form.type" class="form-select" required>
+              <select
+                id="acc-type"
+                v-model="form.type"
+                class="form-select"
+                :disabled="!!editingAccountId"
+                required
+              >
                 <option value="CREDIT">Credit</option>
                 <option value="CHECKING">Checking</option>
                 <option value="CASH">Cash</option>
@@ -293,6 +571,20 @@ async function removeAccount(id: string) {
                 type="number"
                 step="0.01"
                 required
+                class="form-control"
+              />
+            </BFormGroup>
+            <BFormGroup
+              v-if="form.type === 'CREDIT'"
+              label="Statement balance (optional)"
+              label-for="acc-statement"
+              class="mb-3"
+            >
+              <input
+                id="acc-statement"
+                v-model.number="form.statementBalance"
+                type="number"
+                step="0.01"
                 class="form-control"
               />
             </BFormGroup>
@@ -348,7 +640,7 @@ async function removeAccount(id: string) {
               <BButton type="submit" variant="primary" :disabled="submitting">
                 {{ submitting ? 'Saving…' : 'Save' }}
               </BButton>
-              <BButton type="button" variant="outline-secondary" @click="showForm = false">
+              <BButton type="button" variant="outline-secondary" @click="closeAccountForm">
                 Cancel
               </BButton>
             </div>
@@ -365,5 +657,26 @@ async function removeAccount(id: string) {
 }
 .account-form {
   max-width: 28rem;
+}
+.sortable-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-align: inherit;
+  color: inherit;
+  cursor: pointer;
+  user-select: none;
+}
+.sortable-th:hover {
+  text-decoration: underline;
+}
+.sort-indicator {
+  font-size: 0.65em;
+  opacity: 0.85;
 }
 </style>

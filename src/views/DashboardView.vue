@@ -9,6 +9,7 @@ import {
   currentBalanceCell,
   dueCell,
   limitCell,
+  paymentDueUrgencyClass,
   statementBalanceCell,
   typeLabel,
 } from '@/composables/useAccountTableFormatters'
@@ -85,7 +86,7 @@ onMounted(async () => {
                 <td class="text-end">{{ currentBalanceCell(a) }}</td>
                 <td class="text-end">{{ statementBalanceCell(a) }}</td>
                 <td class="text-end">{{ limitCell(a) }}</td>
-                <td>{{ dueCell(a) }}</td>
+                <td :class="paymentDueUrgencyClass(a)">{{ dueCell(a) }}</td>
                 <td>{{ closingCell(a) }}</td>
                 <td class="text-end text-nowrap">
                   <RouterLink
