@@ -5,10 +5,11 @@ import { listAccounts, deleteAccount } from '@/api/accounts'
 import { listTransactions } from '@/api/transactions'
 import type { AccountResponse, TxnResponse } from '@/types/api'
 import {
-  amountCell,
   closingCell,
+  currentBalanceCell,
   dueCell,
   limitCell,
+  statementBalanceCell,
   typeLabel,
 } from '@/composables/useAccountTableFormatters'
 import { BAlert, BButton } from 'bootstrap-vue-next'
@@ -69,10 +70,11 @@ onMounted(async () => {
               <tr>
                 <th scope="col">Name</th>
                 <th scope="col">Type</th>
-                <th scope="col" class="text-end">Amount</th>
+                <th scope="col" class="text-end">Current balance</th>
+                <th scope="col" class="text-end">Statement balance</th>
                 <th scope="col" class="text-end">Limit</th>
-                <th scope="col">Due</th>
-                <th scope="col">Closing</th>
+                <th scope="col">Payment due date</th>
+                <th scope="col">Next closing date</th>
                 <th scope="col" class="text-end">Action</th>
               </tr>
             </thead>
@@ -80,7 +82,8 @@ onMounted(async () => {
               <tr v-for="a in accounts" :key="a.id">
                 <td>{{ a.name }}</td>
                 <td>{{ typeLabel(a.type) }}</td>
-                <td class="text-end text-muted">{{ amountCell(a) }}</td>
+                <td class="text-end">{{ currentBalanceCell(a) }}</td>
+                <td class="text-end">{{ statementBalanceCell(a) }}</td>
                 <td class="text-end">{{ limitCell(a) }}</td>
                 <td>{{ dueCell(a) }}</td>
                 <td>{{ closingCell(a) }}</td>

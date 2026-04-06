@@ -1,4 +1,3 @@
-/** Types aligned with Zenmo OpenAPI (zenmo-api.json) */
 
 export type AccountType = 'CHECKING' | 'CASH' | 'CREDIT_CARD'
 export type TxnStatus = 'PENDING' | 'POSTED'
@@ -42,6 +41,8 @@ export interface AccountResponse {
   type: AccountType
   currency: string
   creditLimit?: number
+  currentBalance?: number
+  statementBalance?: number
   paymentDueDay?: number
   closingDay: number
   archived: boolean
