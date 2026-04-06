@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { listAccounts, createAccount, deleteAccount } from '@/api/accounts'
 import type { AccountResponse, AccountType } from '@/types/api'
 import {
@@ -8,7 +8,6 @@ import {
   dueCell,
   limitCell,
   statementBalanceCell,
-  typeLabel,
 } from '@/composables/useAccountTableFormatters'
 import { BAlert, BButton, BForm, BFormGroup, BFormInput } from 'bootstrap-vue-next'
 
@@ -25,6 +24,11 @@ function newAccountForm() {
 }
 
 const accounts = ref<AccountResponse[]>([])
+const creditAccounts = computed(() => accounts.value.filter((a) => a.type === 'CREDIT'))
+const checkingAndCashAccounts = computed(() =>
+  accounts.value.filter((a) => a.type === 'CHECKING' || a.type === 'CASH'),
+)
+const savingsAccounts = computed(() => accounts.value.filter((a) => a.type === 'SAVINGS'))
 const loading = ref(true)
 const error = ref('')
 const showForm = ref(false)
@@ -127,55 +131,138 @@ async function removeAccount(id: string) {
       <p class="text-muted">Loading…</p>
     </template>
     <template v-else>
-      <section class="mb-4">
-        <h2 class="h4">All accounts</h2>
-        <div v-if="accounts.length" class="table-responsive">
-          <table class="table table-striped table-sm table-hover align-middle">
-            <thead>
-              <tr>
-                <th scope="col">Name</th>
-                <th scope="col">Type</th>
-                <th scope="col" class="text-end">Current balance</th>
-                <th scope="col" class="text-end">Statement balance</th>
-                <th scope="col" class="text-end">Limit</th>
-                <th scope="col">Payment due date</th>
-                <th scope="col">Next closing date</th>
-                <th scope="col" class="text-end">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="a in accounts" :key="a.id">
-                <td>{{ a.name }}</td>
-                <td>{{ typeLabel(a.type) }}</td>
-                <td class="text-end">{{ currentBalanceCell(a) }}</td>
-                <td class="text-end">{{ statementBalanceCell(a) }}</td>
-                <td class="text-end">{{ limitCell(a) }}</td>
-                <td>{{ dueCell(a) }}</td>
-                <td>{{ closingCell(a) }}</td>
-                <td class="text-end text-nowrap">
-                  <BButton
-                    variant="outline-secondary"
-                    size="sm"
-                    class="me-1"
-                    @click="openAddForm"
-                  >
-                    Edit
-                  </BButton>
-                  <BButton
-                    variant="outline-danger"
-                    size="sm"
-                    :disabled="deleteId === a.id"
-                    @click="removeAccount(a.id)"
-                  >
-                    {{ deleteId === a.id ? '…' : 'Delete' }}
-                  </BButton>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p v-else class="text-muted">No accounts.</p>
-      </section>
+      <template v-if="!accounts.length">
+        <p class="text-muted">No accounts.</p>
+      </template>
+      <template v-else>
+        <section class="mb-4">
+          <h2 class="h4">Credit accounts</h2>
+          <div v-if="creditAccounts.length" class="table-responsive">
+            <table class="table table-striped table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col" class="text-end">Current balance</th>
+                  <th scope="col" class="text-end">Statement balance</th>
+                  <th scope="col" class="text-end">Limit</th>
+                  <th scope="col">Payment due date</th>
+                  <th scope="col">Next closing date</th>
+                  <th scope="col" class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="a in creditAccounts" :key="a.id">
+                  <td>{{ a.name }}</td>
+                  <td class="text-end">{{ currentBalanceCell(a) }}</td>
+                  <td class="text-end">{{ statementBalanceCell(a) }}</td>
+                  <td class="text-end">{{ limitCell(a) }}</td>
+                  <td>{{ dueCell(a) }}</td>
+                  <td>{{ closingCell(a) }}</td>
+                  <td class="text-end text-nowrap">
+                    <BButton
+                      variant="outline-secondary"
+                      size="sm"
+                      class="me-1"
+                      @click="openAddForm"
+                    >
+                      Edit
+                    </BButton>
+                    <BButton
+                      variant="outline-danger"
+                      size="sm"
+                      :disabled="deleteId === a.id"
+                      @click="removeAccount(a.id)"
+                    >
+                      {{ deleteId === a.id ? '…' : 'Delete' }}
+                    </BButton>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else class="text-muted">No credit accounts.</p>
+        </section>
+
+        <section class="mb-4">
+          <h2 class="h4">Checking &amp; cash</h2>
+          <div v-if="checkingAndCashAccounts.length" class="table-responsive">
+            <table class="table table-striped table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col" class="text-end">Current balance</th>
+                  <th scope="col" class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="a in checkingAndCashAccounts" :key="a.id">
+                  <td>{{ a.name }}</td>
+                  <td class="text-end">{{ currentBalanceCell(a) }}</td>
+                  <td class="text-end text-nowrap">
+                    <BButton
+                      variant="outline-secondary"
+                      size="sm"
+                      class="me-1"
+                      @click="openAddForm"
+                    >
+                      Edit
+                    </BButton>
+                    <BButton
+                      variant="outline-danger"
+                      size="sm"
+                      :disabled="deleteId === a.id"
+                      @click="removeAccount(a.id)"
+                    >
+                      {{ deleteId === a.id ? '…' : 'Delete' }}
+                    </BButton>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else class="text-muted">No checking or cash accounts.</p>
+        </section>
+
+        <section class="mb-4">
+          <h2 class="h4">Savings</h2>
+          <div v-if="savingsAccounts.length" class="table-responsive">
+            <table class="table table-striped table-sm table-hover align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Name</th>
+                  <th scope="col" class="text-end">Current balance</th>
+                  <th scope="col" class="text-end">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="a in savingsAccounts" :key="a.id">
+                  <td>{{ a.name }}</td>
+                  <td class="text-end">{{ currentBalanceCell(a) }}</td>
+                  <td class="text-end text-nowrap">
+                    <BButton
+                      variant="outline-secondary"
+                      size="sm"
+                      class="me-1"
+                      @click="openAddForm"
+                    >
+                      Edit
+                    </BButton>
+                    <BButton
+                      variant="outline-danger"
+                      size="sm"
+                      :disabled="deleteId === a.id"
+                      @click="removeAccount(a.id)"
+                    >
+                      {{ deleteId === a.id ? '…' : 'Delete' }}
+                    </BButton>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p v-else class="text-muted">No savings accounts.</p>
+        </section>
+      </template>
 
       <section
         v-if="showForm"
