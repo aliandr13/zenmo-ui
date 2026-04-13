@@ -1,8 +1,10 @@
 # Build and push UI (nginx) image to GHCR on merge to main (linux/amd64 + linux/arm64).
 # Image: ghcr.io/<owner>/zenmo-ui
 #
-# Set repository variable VITE_API_URL (Settings → Secrets and variables → Actions → Variables)
-# to your public API base URL (e.g. https://api.example.com). If unset, http://localhost:8080 is used.
+# Set repository variable VITE_API_URL (Settings → Secrets and variables → Actions → Variables):
+#   - `relative` if nginx in this image proxies /api to the backend on the same host:port
+#   - or an absolute API base (e.g. https://api.example.com) for split-host deployments
+# If unset, http://localhost:8080 is used (CI smoke tests only).
 
 name: Publish Docker image
 

@@ -9,8 +9,8 @@ RUN npm ci
 
 COPY . .
 
-# API URL is baked in at build time (Vite). Echo ties this layer to ARG so BuildKit
-# cannot reuse a cached build from a different VITE_API_URL (e.g. localhost).
+# API URL is baked in at build time (Vite). Use `relative` when nginx proxies /api on the same host.
+# Echo ties this layer to ARG so BuildKit cannot reuse a cached build from a different VITE_API_URL.
 ARG VITE_API_URL=http://localhost:8080
 ENV VITE_API_URL=$VITE_API_URL
 RUN echo "Vite build VITE_API_URL=$VITE_API_URL" && npm run build

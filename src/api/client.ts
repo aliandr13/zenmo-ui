@@ -1,4 +1,13 @@
-const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+/** Same-origin API via nginx: build with VITE_API_URL=relative. Else absolute base or local dev default. */
+function resolveApiBaseUrl(): string {
+  const raw = import.meta.env.VITE_API_URL as string | undefined
+  if (raw === 'relative') return ''
+  if (raw !== undefined && raw !== '') return raw
+  return 'http://localhost:8080'
+}
+
+const baseUrl = resolveApiBaseUrl()
+const baseUrlLabel = baseUrl === '' ? 'same origin (/api)' : baseUrl
 
 export type RequestInitWithAuth = RequestInit & { skipAuth?: boolean }
 
@@ -79,7 +88,7 @@ export async function apiJson<T>(path: string, init: RequestInitWithAuth = {}): 
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'Request failed'
     if (msg === 'Load failed' || msg === 'Failed to fetch' || msg.includes('NetworkError')) {
-      throw new Error(`Cannot reach API at ${baseUrl}. Is the backend running? CORS must allow this origin.`)
+      throw new Error(`Cannot reach API at ${baseUrlLabel}. Is the backend running? CORS must allow this origin.`)
     }
     throw e
   }
