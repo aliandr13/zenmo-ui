@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Absolute API base URL, or `relative` for same-origin /api (nginx proxy). */
+  /** Absolute API base URL, or `relative` for same-origin /api (Caddy proxy in Docker). */
   readonly VITE_API_URL?: string
 }
 

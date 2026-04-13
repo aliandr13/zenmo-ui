@@ -1,0 +1,4 @@
+# Local / docker-compose: HTTP on :80 (no TLS). Same stack as before nginx removal.
+http://:80 {
+	import zenmo-app.caddy
+}

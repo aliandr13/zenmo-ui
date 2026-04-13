@@ -9,16 +9,18 @@ RUN npm ci
 
 COPY . .
 
-# API URL is baked in at build time (Vite). Use `relative` when nginx proxies /api on the same host.
+# API URL is baked in at build time (Vite). Use `relative` when Caddy proxies /api on the same host.
 # Echo ties this layer to ARG so BuildKit cannot reuse a cached build from a different VITE_API_URL.
 ARG VITE_API_URL=http://localhost:8080
 ENV VITE_API_URL=$VITE_API_URL
 RUN echo "Vite build VITE_API_URL=$VITE_API_URL" && npm run build
 
 # --- run ---
-FROM nginx:1.27-alpine
+FROM caddy:2-alpine
 
-COPY nginx/default.conf /etc/nginx/conf.d/default.conf
-COPY --from=build /app/dist /usr/share/nginx/html
+COPY caddy/Caddyfile /etc/caddy/Caddyfile
+COPY caddy/Caddyfile.production /etc/caddy/Caddyfile.production
+COPY caddy/zenmo-app.caddy /etc/caddy/zenmo-app.caddy
+COPY --from=build /app/dist /srv
 
-EXPOSE 80
+EXPOSE 80 443

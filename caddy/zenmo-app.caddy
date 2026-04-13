@@ -1,0 +1,23 @@
+root * /srv
+encode gzip
+
+handle /api/* {
+	reverse_proxy api:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+		header_up X-Forwarded-Host {host}
+	}
+}
+
+@cached path_regexp fileext \.(js|mjs|css|png|jpg|jpeg|gif|ico|svg|woff2?)$
+handle @cached {
+	header Cache-Control "public, max-age=604800, immutable"
+	file_server
+}
+
+handle {
+	try_files {path} /index.html
+	file_server
+}

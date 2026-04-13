@@ -1,4 +1,4 @@
-/** Same-origin API via nginx: build with VITE_API_URL=relative. Else absolute base or local dev default. */
+/** Same-origin API via Caddy: build with VITE_API_URL=relative. Else absolute base or local dev default. */
 function resolveApiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_URL as string | undefined
   if (raw === 'relative') return ''
