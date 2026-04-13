@@ -1,4 +1,4 @@
-# Build and push UI (nginx) image to GHCR on merge to main.
+# Build and push UI (nginx) image to GHCR on merge to main (linux/amd64 + linux/arm64).
 # Image: ghcr.io/<owner>/zenmo-ui
 #
 # Set repository variable VITE_API_URL (Settings → Secrets and variables → Actions → Variables)
@@ -50,6 +50,7 @@ jobs:
         with:
           context: .
           file: Dockerfile
+          platforms: linux/amd64
           push: true
           build-args: |
             VITE_API_URL=${{ steps.vite.outputs.url }}
