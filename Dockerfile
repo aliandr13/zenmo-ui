@@ -19,7 +19,7 @@ RUN echo "Vite build VITE_API_URL=$VITE_API_URL" && npm run build
 FROM caddy:2-alpine
 
 COPY caddy/Caddyfile /etc/caddy/Caddyfile
-COPY caddy/Caddyfile.production /etc/caddy/Caddyfile.production
+COPY caddy/Caddyfile.local /etc/caddy/Caddyfile.local
 COPY caddy/zenmo-app.caddy /etc/caddy/zenmo-app.caddy
 COPY --from=build /app/dist /srv
 
