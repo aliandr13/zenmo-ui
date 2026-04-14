@@ -231,7 +231,7 @@ async function submitAccount() {
     creditLimit: form.value.type === 'CREDIT' ? form.value.creditLimit : undefined,
     statementBalance,
     paymentDueDay: form.value.type === 'CREDIT' ? form.value.paymentDueDay : undefined,
-    closingDay: form.value.closingDay ?? 1,
+    closingDay: form.value.type === 'CREDIT' ? form.value.closingDay : undefined,
     currentBalance: bal,
   }
   try {

@@ -99,7 +99,7 @@ export function daysUntilPaymentDue(a: AccountResponse): number | null {
 
 /** Days until next calendar occurrence of statement closing day; null if not credit. */
 export function daysUntilClosingDay(a: AccountResponse): number | null {
-  if (a.type !== 'CREDIT') return null
+  if (a.type !== 'CREDIT' || a.closingDay == null) return null
   return nextDayOfMonthInfo(a.closingDay).days
 }
 
@@ -115,6 +115,6 @@ export function paymentDueUrgencyClass(a: AccountResponse): string {
 }
 
 export function closingCell(a: AccountResponse): string {
-  if (a.type !== 'CREDIT') return '—'
+  if (a.type !== 'CREDIT' || a.closingDay == null) return '—'
   return formatNextDayOfMonth(a.closingDay)
 }

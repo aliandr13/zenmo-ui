@@ -33,7 +33,7 @@ export interface AccountRequest {
   creditLimit?: number
   statementBalance?: number
   paymentDueDay?: number
-  closingDay: number
+  closingDay?: number
   currentBalance?: number
 }
 
@@ -46,7 +46,7 @@ export interface AccountResponse {
   currentBalance?: number
   statementBalance?: number
   paymentDueDay?: number
-  closingDay: number
+  closingDay?: number
   archived: boolean
   createdAt: string
 }
