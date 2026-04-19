@@ -50,7 +50,12 @@ function calendarDaysBetweenUtc(
 }
 
 /** Next calendar occurrence of `dayOfMonth` (1–31): this month if today <= day, else next month. */
-function nextDayOfMonthInfo(dayOfMonth: number): { days: number; dateStr: string } {
+function nextDayOfMonthInfo(dayOfMonth: number): {
+  days: number
+  dateStr: string
+  monthNum: number
+  dayNum: number
+} {
   const now = new Date()
   const todayY = now.getFullYear()
   const todayM = now.getMonth()
@@ -76,19 +81,23 @@ function nextDayOfMonthInfo(dayOfMonth: number): { days: number; dateStr: string
   const tm = targetDate.getMonth()
   const td = targetDate.getDate()
   const days = calendarDaysBetweenUtc(todayY, todayM, todayD, ty, tm, td)
+  const monthNum = tm + 1
 
-  return { days, dateStr }
+  return { days, dateStr, monthNum, dayNum: td }
 }
 
-function formatNextDayOfMonth(dayOfMonth: number): string {
-  const { days, dateStr } = nextDayOfMonthInfo(dayOfMonth)
+function formatNextDayOfMonth(dayOfMonth: number, compact: boolean): string {
+  const { days, dateStr, monthNum, dayNum } = nextDayOfMonthInfo(dayOfMonth)
+  if (compact) {
+    return `${monthNum}/${dayNum} (${days})`
+  }
   if (days === 0) return `${dateStr} (today)`
   return `${dateStr} (in ${days} day${days === 1 ? '' : 's'})`
 }
 
-export function dueCell(a: AccountResponse): string {
+export function dueCell(a: AccountResponse, compact = false): string {
   if (a.type !== 'CREDIT' || a.paymentDueDay == null) return '—'
-  return formatNextDayOfMonth(a.paymentDueDay)
+  return formatNextDayOfMonth(a.paymentDueDay, compact)
 }
 
 /** Days until next calendar occurrence of payment due day; null if N/A. Sort by this, not raw day-of-month. */
@@ -114,7 +123,7 @@ export function paymentDueUrgencyClass(a: AccountResponse): string {
   return ''
 }
 
-export function closingCell(a: AccountResponse): string {
+export function closingCell(a: AccountResponse, compact = false): string {
   if (a.type !== 'CREDIT' || a.closingDay == null) return '—'
-  return formatNextDayOfMonth(a.closingDay)
+  return formatNextDayOfMonth(a.closingDay, compact)
 }

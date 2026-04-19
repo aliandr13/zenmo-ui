@@ -8,11 +8,13 @@ import {
   daysUntilClosingDay,
   daysUntilPaymentDue,
   dueCell,
-  limitCell,
   paymentDueUrgencyClass,
   statementBalanceCell,
 } from '@/composables/useAccountTableFormatters'
-import { BAlert, BButton, BForm, BFormGroup, BFormInput } from 'bootstrap-vue-next'
+import { useNarrowViewport } from '@/composables/useNarrowViewport'
+import { BAlert, BButton, BForm, BFormGroup, BFormInput, BModal } from 'bootstrap-vue-next'
+
+const isNarrowViewport = useNarrowViewport()
 
 function newAccountForm() {
   return {
@@ -47,7 +49,7 @@ function accountToForm(a: AccountResponse) {
 }
 
 type SortDir = 'asc' | 'desc'
-type CreditSortKey = 'name' | 'currentBalance' | 'statementBalance' | 'creditLimit' | 'paymentDueDay' | 'closingDay'
+type CreditSortKey = 'name' | 'currentBalance' | 'statementBalance' | 'paymentDueDay' | 'closingDay'
 type SimpleSortKey = 'name' | 'currentBalance'
 
 function compareNullableNum(
@@ -75,8 +77,6 @@ function sortCreditRows(list: AccountResponse[], key: CreditSortKey, dir: SortDi
         return compareNullableNum(a.currentBalance, b.currentBalance, dir)
       case 'statementBalance':
         return compareNullableNum(a.statementBalance, b.statementBalance, dir)
-      case 'creditLimit':
-        return compareNullableNum(a.creditLimit, b.creditLimit, dir)
       case 'paymentDueDay':
         return compareNullableNum(daysUntilPaymentDue(a), daysUntilPaymentDue(b), dir)
       case 'closingDay':
@@ -150,9 +150,11 @@ const loading = ref(true)
 const error = ref('')
 const showForm = ref(false)
 const editingAccountId = ref<string | null>(null)
+const selectedAccountId = ref<string | null>(null)
 const form = ref(newAccountForm())
 const submitting = ref(false)
-const deleteId = ref<string | null>(null)
+const deleting = ref(false)
+const showDeleteModal = ref(false)
 
 async function load() {
   loading.value = true
@@ -170,6 +172,8 @@ onMounted(load)
 
 async function openAddForm() {
   editingAccountId.value = null
+  selectedAccountId.value = null
+  showDeleteModal.value = false
   form.value = newAccountForm()
   error.value = ''
   showForm.value = true
@@ -179,6 +183,7 @@ async function openAddForm() {
 
 async function openEditForm(a: AccountResponse) {
   editingAccountId.value = a.id
+  selectedAccountId.value = a.id
   form.value = accountToForm(a)
   error.value = ''
   showForm.value = true
@@ -189,6 +194,8 @@ async function openEditForm(a: AccountResponse) {
 function closeAccountForm() {
   showForm.value = false
   editingAccountId.value = null
+  selectedAccountId.value = null
+  showDeleteModal.value = false
 }
 
 async function submitAccount() {
@@ -243,6 +250,7 @@ async function submitAccount() {
     }
     form.value = newAccountForm()
     editingAccountId.value = null
+    selectedAccountId.value = null
     showForm.value = false
     await load()
   } catch (e) {
@@ -252,17 +260,29 @@ async function submitAccount() {
   }
 }
 
-async function removeAccount(id: string) {
-  if (!confirm('Delete this account?')) return
-  deleteId.value = id
+function openDeleteAccountModal() {
+  if (!editingAccountId.value) return
+  showDeleteModal.value = true
+}
+
+async function confirmDeleteAccount(hide: (trigger?: string) => void) {
+  const id = editingAccountId.value
+  if (!id) {
+    hide('cancel')
+    return
+  }
+  deleting.value = true
   error.value = ''
   try {
     await deleteAccount(id)
+    hide('ok')
+    form.value = newAccountForm()
+    closeAccountForm()
     await load()
   } catch (e) {
     error.value = e instanceof Error ? e.message : 'Failed to delete'
   } finally {
-    deleteId.value = null
+    deleting.value = false
   }
 }
 </script>
@@ -287,7 +307,7 @@ async function removeAccount(id: string) {
         <section class="mb-4">
           <h2 class="h4">Credit accounts</h2>
           <div v-if="creditAccounts.length" class="table-responsive">
-            <table class="table table-striped table-sm table-hover align-middle">
+            <table class="table table-striped table-sm table-hover align-middle text-center">
               <thead>
                 <tr>
                   <th
@@ -303,15 +323,10 @@ async function removeAccount(id: string) {
                   </th>
                   <th
                     scope="col"
-                    class="text-end"
                     :aria-sort="ariaSortFor(creditSort.key, 'currentBalance', creditSort.dir)"
                   >
-                    <button
-                      type="button"
-                      class="sortable-th justify-content-end"
-                      @click="toggleCreditSort('currentBalance')"
-                    >
-                      Current balance
+                    <button type="button" class="sortable-th" @click="toggleCreditSort('currentBalance')">
+                      Current
                       <span v-if="creditSort.key === 'currentBalance'" class="sort-indicator" aria-hidden="true">
                         {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
                       </span>
@@ -319,32 +334,11 @@ async function removeAccount(id: string) {
                   </th>
                   <th
                     scope="col"
-                    class="text-end"
                     :aria-sort="ariaSortFor(creditSort.key, 'statementBalance', creditSort.dir)"
                   >
-                    <button
-                      type="button"
-                      class="sortable-th justify-content-end"
-                      @click="toggleCreditSort('statementBalance')"
-                    >
-                      Statement balance
+                    <button type="button" class="sortable-th" @click="toggleCreditSort('statementBalance')">
+                      Statement
                       <span v-if="creditSort.key === 'statementBalance'" class="sort-indicator" aria-hidden="true">
-                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
-                      </span>
-                    </button>
-                  </th>
-                  <th
-                    scope="col"
-                    class="text-end"
-                    :aria-sort="ariaSortFor(creditSort.key, 'creditLimit', creditSort.dir)"
-                  >
-                    <button
-                      type="button"
-                      class="sortable-th justify-content-end"
-                      @click="toggleCreditSort('creditLimit')"
-                    >
-                      Limit
-                      <span v-if="creditSort.key === 'creditLimit'" class="sort-indicator" aria-hidden="true">
                         {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
                       </span>
                     </button>
@@ -354,7 +348,7 @@ async function removeAccount(id: string) {
                     :aria-sort="ariaSortFor(creditSort.key, 'paymentDueDay', creditSort.dir)"
                   >
                     <button type="button" class="sortable-th" @click="toggleCreditSort('paymentDueDay')">
-                      Payment due date
+                      Payment
                       <span v-if="creditSort.key === 'paymentDueDay'" class="sort-indicator" aria-hidden="true">
                         {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
                       </span>
@@ -365,41 +359,28 @@ async function removeAccount(id: string) {
                     :aria-sort="ariaSortFor(creditSort.key, 'closingDay', creditSort.dir)"
                   >
                     <button type="button" class="sortable-th" @click="toggleCreditSort('closingDay')">
-                      Next closing date
+                      Closing
                       <span v-if="creditSort.key === 'closingDay'" class="sort-indicator" aria-hidden="true">
                         {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
                       </span>
                     </button>
                   </th>
-                  <th scope="col" class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in sortedCreditAccounts" :key="a.id">
+                <tr
+                  v-for="a in sortedCreditAccounts"
+                  :key="a.id"
+                  class="account-table-row"
+                  :class="{ 'table-active': selectedAccountId === a.id }"
+                  title="Click to edit"
+                  @click="openEditForm(a)"
+                >
                   <td>{{ a.name }}</td>
-                  <td class="text-end">{{ currentBalanceCell(a) }}</td>
-                  <td class="text-end">{{ statementBalanceCell(a) }}</td>
-                  <td class="text-end">{{ limitCell(a) }}</td>
-                  <td :class="paymentDueUrgencyClass(a)">{{ dueCell(a) }}</td>
-                  <td>{{ closingCell(a) }}</td>
-                  <td class="text-end text-nowrap">
-                    <BButton
-                      variant="outline-secondary"
-                      size="sm"
-                      class="me-1"
-                      @click="openEditForm(a)"
-                    >
-                      Edit
-                    </BButton>
-                    <BButton
-                      variant="outline-danger"
-                      size="sm"
-                      :disabled="deleteId === a.id"
-                      @click="removeAccount(a.id)"
-                    >
-                      {{ deleteId === a.id ? '…' : 'Delete' }}
-                    </BButton>
-                  </td>
+                  <td>{{ currentBalanceCell(a) }}</td>
+                  <td>{{ statementBalanceCell(a) }}</td>
+                  <td :class="paymentDueUrgencyClass(a)">{{ dueCell(a, isNarrowViewport) }}</td>
+                  <td>{{ closingCell(a, isNarrowViewport) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -409,8 +390,8 @@ async function removeAccount(id: string) {
 
         <section class="mb-4">
           <h2 class="h4">Checking &amp; cash</h2>
-          <div v-if="checkingAndCashAccounts.length" class="table-responsive">
-            <table class="table table-striped table-sm table-hover align-middle">
+          <div v-if="checkingAndCashAccounts.length" class="table-responsive account-compact-table-wrap">
+            <table class="table table-striped table-sm table-hover align-middle text-center">
               <thead>
                 <tr>
                   <th
@@ -426,45 +407,28 @@ async function removeAccount(id: string) {
                   </th>
                   <th
                     scope="col"
-                    class="text-end"
                     :aria-sort="ariaSortFor(checkingSort.key, 'currentBalance', checkingSort.dir)"
                   >
-                    <button
-                      type="button"
-                      class="sortable-th justify-content-end"
-                      @click="toggleCheckingSort('currentBalance')"
-                    >
-                      Current balance
+                    <button type="button" class="sortable-th" @click="toggleCheckingSort('currentBalance')">
+                      Current
                       <span v-if="checkingSort.key === 'currentBalance'" class="sort-indicator" aria-hidden="true">
                         {{ checkingSort.dir === 'asc' ? '▲' : '▼' }}
                       </span>
                     </button>
                   </th>
-                  <th scope="col" class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in sortedCheckingAndCashAccounts" :key="a.id">
+                <tr
+                  v-for="a in sortedCheckingAndCashAccounts"
+                  :key="a.id"
+                  class="account-table-row"
+                  :class="{ 'table-active': selectedAccountId === a.id }"
+                  title="Click to edit"
+                  @click="openEditForm(a)"
+                >
                   <td>{{ a.name }}</td>
-                  <td class="text-end">{{ currentBalanceCell(a) }}</td>
-                  <td class="text-end text-nowrap">
-                    <BButton
-                      variant="outline-secondary"
-                      size="sm"
-                      class="me-1"
-                      @click="openEditForm(a)"
-                    >
-                      Edit
-                    </BButton>
-                    <BButton
-                      variant="outline-danger"
-                      size="sm"
-                      :disabled="deleteId === a.id"
-                      @click="removeAccount(a.id)"
-                    >
-                      {{ deleteId === a.id ? '…' : 'Delete' }}
-                    </BButton>
-                  </td>
+                  <td>{{ currentBalanceCell(a) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -474,8 +438,8 @@ async function removeAccount(id: string) {
 
         <section class="mb-4">
           <h2 class="h4">Savings</h2>
-          <div v-if="savingsAccounts.length" class="table-responsive">
-            <table class="table table-striped table-sm table-hover align-middle">
+          <div v-if="savingsAccounts.length" class="table-responsive account-compact-table-wrap">
+            <table class="table table-striped table-sm table-hover align-middle text-center">
               <thead>
                 <tr>
                   <th
@@ -491,45 +455,28 @@ async function removeAccount(id: string) {
                   </th>
                   <th
                     scope="col"
-                    class="text-end"
                     :aria-sort="ariaSortFor(savingsSort.key, 'currentBalance', savingsSort.dir)"
                   >
-                    <button
-                      type="button"
-                      class="sortable-th justify-content-end"
-                      @click="toggleSavingsSort('currentBalance')"
-                    >
-                      Current balance
+                    <button type="button" class="sortable-th" @click="toggleSavingsSort('currentBalance')">
+                      Current
                       <span v-if="savingsSort.key === 'currentBalance'" class="sort-indicator" aria-hidden="true">
                         {{ savingsSort.dir === 'asc' ? '▲' : '▼' }}
                       </span>
                     </button>
                   </th>
-                  <th scope="col" class="text-end">Action</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="a in sortedSavingsAccounts" :key="a.id">
+                <tr
+                  v-for="a in sortedSavingsAccounts"
+                  :key="a.id"
+                  class="account-table-row"
+                  :class="{ 'table-active': selectedAccountId === a.id }"
+                  title="Click to edit"
+                  @click="openEditForm(a)"
+                >
                   <td>{{ a.name }}</td>
-                  <td class="text-end">{{ currentBalanceCell(a) }}</td>
-                  <td class="text-end text-nowrap">
-                    <BButton
-                      variant="outline-secondary"
-                      size="sm"
-                      class="me-1"
-                      @click="openEditForm(a)"
-                    >
-                      Edit
-                    </BButton>
-                    <BButton
-                      variant="outline-danger"
-                      size="sm"
-                      :disabled="deleteId === a.id"
-                      @click="removeAccount(a.id)"
-                    >
-                      {{ deleteId === a.id ? '…' : 'Delete' }}
-                    </BButton>
-                  </td>
+                  <td>{{ currentBalanceCell(a) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -638,18 +585,56 @@ async function removeAccount(id: string) {
                 class="form-control"
               />
             </BFormGroup>
-            <div class="d-flex gap-2">
-              <BButton type="submit" variant="primary" :disabled="submitting">
-                {{ submitting ? 'Saving…' : 'Save' }}
-              </BButton>
-              <BButton type="button" variant="outline-secondary" @click="closeAccountForm">
-                Cancel
+            <div class="d-flex justify-content-between align-items-center gap-2 account-form-actions">
+              <div class="d-flex gap-2">
+                <BButton type="submit" variant="primary" :disabled="submitting || deleting">
+                  {{ submitting ? 'Saving…' : 'Save' }}
+                </BButton>
+                <BButton
+                  type="button"
+                  variant="outline-secondary"
+                  :disabled="submitting || deleting"
+                  @click="closeAccountForm"
+                >
+                  Cancel
+                </BButton>
+              </div>
+              <BButton
+                v-if="editingAccountId"
+                type="button"
+                variant="outline-danger"
+                :disabled="submitting || deleting"
+                @click="openDeleteAccountModal"
+              >
+                Delete
               </BButton>
             </div>
           </BForm>
         </div>
       </section>
     </template>
+
+    <BModal
+      id="account-delete-modal"
+      v-model="showDeleteModal"
+      title="Confirm Deletion"
+      centered
+      header-bg-variant="danger"
+      header-text-variant="white"
+      header-close-class="btn-close-white"
+    >
+      <p class="mb-0">
+        Are you sure you want to delete this account? This action cannot be undone.
+      </p>
+      <template #footer="{ hide }">
+        <BButton variant="secondary" :disabled="deleting" @click="hide('cancel')">
+          Cancel
+        </BButton>
+        <BButton variant="danger" :disabled="deleting" @click="confirmDeleteAccount(hide)">
+          {{ deleting ? 'Deleting…' : 'Delete' }}
+        </BButton>
+      </template>
+    </BModal>
   </div>
 </template>
 
@@ -663,13 +648,14 @@ async function removeAccount(id: string) {
 .sortable-th {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 0.25rem;
   width: 100%;
   padding: 0;
   border: none;
   background: none;
   font: inherit;
-  text-align: inherit;
+  text-align: center;
   color: inherit;
   cursor: pointer;
   user-select: none;
@@ -680,5 +666,11 @@ async function removeAccount(id: string) {
 .sort-indicator {
   font-size: 0.65em;
   opacity: 0.85;
+}
+.account-table-row {
+  cursor: pointer;
+}
+.account-compact-table-wrap {
+  max-width: min(28rem, 100%);
 }
 </style>

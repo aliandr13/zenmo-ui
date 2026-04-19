@@ -9,6 +9,7 @@ import {
   paymentDueUrgencyClass,
   typeLabel,
 } from '@/composables/useAccountTableFormatters'
+import { useNarrowViewport } from '@/composables/useNarrowViewport'
 import {
   nearestClosingAccount,
   nearestPaymentDueAccount,
@@ -21,6 +22,7 @@ import {
 } from '@/composables/useDashboardSummaries'
 import { BAlert } from 'bootstrap-vue-next'
 
+const isNarrowViewport = useNarrowViewport()
 const accounts = ref<AccountResponse[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -85,7 +87,9 @@ onMounted(async () => {
             <div class="card-body">
               <template v-if="nearestDue">
                 <h1 class="card-title pricing-card-title text-truncate px-1">{{ nearestDue.name }}</h1>
-                <p class="mb-0 mt-2" :class="paymentDueUrgencyClass(nearestDue)">{{ dueCell(nearestDue) }}</p>
+                <p class="mb-0 mt-2" :class="paymentDueUrgencyClass(nearestDue)">
+                  {{ dueCell(nearestDue, isNarrowViewport) }}
+                </p>
               </template>
               <template v-else>
                 <h1 class="card-title pricing-card-title text-body-secondary">—</h1>
@@ -103,7 +107,7 @@ onMounted(async () => {
             <div class="card-body">
               <template v-if="nearestClosing">
                 <h1 class="card-title pricing-card-title text-truncate px-1">{{ nearestClosing.name }}</h1>
-                <p class="text-muted mb-0 mt-2">{{ closingCell(nearestClosing) }}</p>
+                <p class="text-muted mb-0 mt-2">{{ closingCell(nearestClosing, isNarrowViewport) }}</p>
               </template>
               <template v-else>
                 <h1 class="card-title pricing-card-title text-body-secondary">—</h1>
