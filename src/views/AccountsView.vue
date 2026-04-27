@@ -8,6 +8,7 @@ import {
   daysUntilClosingDay,
   daysUntilPaymentDue,
   dueCell,
+  formatMoney,
   paymentDueUrgencyClass,
   statementBalanceCell,
 } from '@/composables/useAccountTableFormatters'
@@ -49,7 +50,13 @@ function accountToForm(a: AccountResponse) {
 }
 
 type SortDir = 'asc' | 'desc'
-type CreditSortKey = 'name' | 'currentBalance' | 'statementBalance' | 'paymentDueDay' | 'closingDay'
+type CreditSortKey =
+  | 'name'
+  | 'currentBalance'
+  | 'utilization'
+  | 'statementBalance'
+  | 'paymentDueDay'
+  | 'closingDay'
 type SimpleSortKey = 'name' | 'currentBalance'
 
 function compareNullableNum(
@@ -66,6 +73,25 @@ function compareNullableNum(
   return dir === 'asc' ? cmp : -cmp
 }
 
+function utilizationValue(currentBalance: number | undefined, creditLimit: number | undefined): number | null {
+  const limit = Number(creditLimit)
+  if (!Number.isFinite(limit) || limit === 0) return null
+  const balance = Number(currentBalance) || 0
+  return balance / limit
+}
+
+function creditUtilization(a: AccountResponse): number | null {
+  return utilizationValue(a.currentBalance, a.creditLimit)
+}
+
+function utilizationCell(value: number | null): string {
+  if (value == null || Number.isNaN(value)) return '—'
+  return new Intl.NumberFormat(undefined, {
+    style: 'percent',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
 function sortCreditRows(list: AccountResponse[], key: CreditSortKey, dir: SortDir): AccountResponse[] {
   return [...list].sort((a, b) => {
     switch (key) {
@@ -75,6 +101,8 @@ function sortCreditRows(list: AccountResponse[], key: CreditSortKey, dir: SortDi
       }
       case 'currentBalance':
         return compareNullableNum(a.currentBalance, b.currentBalance, dir)
+      case 'utilization':
+        return compareNullableNum(creditUtilization(a), creditUtilization(b), dir)
       case 'statementBalance':
         return compareNullableNum(a.statementBalance, b.statementBalance, dir)
       case 'paymentDueDay':
@@ -121,6 +149,27 @@ const sortedCheckingAndCashAccounts = computed(() =>
 )
 const sortedSavingsAccounts = computed(() =>
   sortSimpleRows(savingsAccounts.value, savingsSort.value.key, savingsSort.value.dir),
+)
+const creditTotalCurrency = computed(() => creditAccounts.value[0]?.currency ?? 'USD')
+const creditCurrentBalanceTotal = computed(() =>
+  creditAccounts.value.reduce((sum, a) => sum + (Number(a.currentBalance) || 0), 0),
+)
+const creditLimitTotal = computed(() =>
+  creditAccounts.value.reduce((sum, a) => sum + (Number(a.creditLimit) || 0), 0),
+)
+const creditUtilizationTotal = computed(() =>
+  utilizationValue(creditCurrentBalanceTotal.value, creditLimitTotal.value),
+)
+const creditStatementBalanceTotal = computed(() =>
+  creditAccounts.value.reduce((sum, a) => sum + (Number(a.statementBalance) || 0), 0),
+)
+const checkingTotalCurrency = computed(() => checkingAndCashAccounts.value[0]?.currency ?? 'USD')
+const checkingCurrentBalanceTotal = computed(() =>
+  checkingAndCashAccounts.value.reduce((sum, a) => sum + (Number(a.currentBalance) || 0), 0),
+)
+const savingsTotalCurrency = computed(() => savingsAccounts.value[0]?.currency ?? 'USD')
+const savingsCurrentBalanceTotal = computed(() =>
+  savingsAccounts.value.reduce((sum, a) => sum + (Number(a.currentBalance) || 0), 0),
 )
 
 function toggleCreditSort(key: CreditSortKey) {
@@ -334,6 +383,17 @@ async function confirmDeleteAccount(hide: (trigger?: string) => void) {
                   </th>
                   <th
                     scope="col"
+                    :aria-sort="ariaSortFor(creditSort.key, 'utilization', creditSort.dir)"
+                  >
+                    <button type="button" class="sortable-th" @click="toggleCreditSort('utilization')">
+                      Utilization
+                      <span v-if="creditSort.key === 'utilization'" class="sort-indicator" aria-hidden="true">
+                        {{ creditSort.dir === 'asc' ? '▲' : '▼' }}
+                      </span>
+                    </button>
+                  </th>
+                  <th
+                    scope="col"
                     :aria-sort="ariaSortFor(creditSort.key, 'statementBalance', creditSort.dir)"
                   >
                     <button type="button" class="sortable-th" @click="toggleCreditSort('statementBalance')">
@@ -378,9 +438,18 @@ async function confirmDeleteAccount(hide: (trigger?: string) => void) {
                 >
                   <td>{{ a.name }}</td>
                   <td>{{ currentBalanceCell(a) }}</td>
+                  <td>{{ utilizationCell(creditUtilization(a)) }}</td>
                   <td>{{ statementBalanceCell(a) }}</td>
                   <td :class="paymentDueUrgencyClass(a)">{{ dueCell(a, isNarrowViewport) }}</td>
                   <td>{{ closingCell(a, isNarrowViewport) }}</td>
+                </tr>
+                <tr class="fw-semibold table-group-divider">
+                  <th scope="row">Total</th>
+                  <td>{{ formatMoney(creditCurrentBalanceTotal, creditTotalCurrency) }}</td>
+                  <td>{{ utilizationCell(creditUtilizationTotal) }}</td>
+                  <td>{{ formatMoney(creditStatementBalanceTotal, creditTotalCurrency) }}</td>
+                  <td></td>
+                  <td></td>
                 </tr>
               </tbody>
             </table>
@@ -430,6 +499,10 @@ async function confirmDeleteAccount(hide: (trigger?: string) => void) {
                   <td>{{ a.name }}</td>
                   <td>{{ currentBalanceCell(a) }}</td>
                 </tr>
+                <tr class="fw-semibold table-group-divider">
+                  <th scope="row">Total</th>
+                  <td>{{ formatMoney(checkingCurrentBalanceTotal, checkingTotalCurrency) }}</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -477,6 +550,10 @@ async function confirmDeleteAccount(hide: (trigger?: string) => void) {
                 >
                   <td>{{ a.name }}</td>
                   <td>{{ currentBalanceCell(a) }}</td>
+                </tr>
+                <tr class="fw-semibold table-group-divider">
+                  <th scope="row">Total</th>
+                  <td>{{ formatMoney(savingsCurrentBalanceTotal, savingsTotalCurrency) }}</td>
                 </tr>
               </tbody>
             </table>
