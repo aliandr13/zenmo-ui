@@ -25,7 +25,7 @@ function newAccountForm() {
     creditLimit: undefined as number | undefined,
     statementBalance: undefined as number | undefined,
     paymentDueDay: undefined as number | undefined,
-    closingDay: 1,
+    closingDay: undefined as number | undefined,
     currentBalance: 0,
   }
 }
@@ -35,7 +35,7 @@ function accountToForm(a: AccountResponse) {
     name: a.name,
     type: a.type,
     currency: a.currency,
-    closingDay: a.closingDay ?? 1,
+    closingDay: a.closingDay as number | undefined,
     currentBalance: a.currentBalance ?? 0,
     creditLimit: undefined as number | undefined,
     statementBalance: undefined as number | undefined,
@@ -265,7 +265,7 @@ async function submitAccount() {
       return
     }
     const d = form.value.closingDay
-    if (d == null || d < 1 || d > 31) {
+    if (d == null || Number.isNaN(d) || d < 1 || d > 31) {
       error.value = 'Closing day must be between 1 and 31'
       return
     }
@@ -659,6 +659,7 @@ async function confirmDeleteAccount(hide: (trigger?: string) => void) {
                 min="1"
                 max="31"
                 required
+                placeholder="e.g. 15"
                 class="form-control"
               />
             </BFormGroup>
