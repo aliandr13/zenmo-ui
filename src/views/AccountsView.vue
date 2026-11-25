@@ -76,8 +76,9 @@ function compareNullableNum(
 function utilizationValue(currentBalance: number | undefined, creditLimit: number | undefined): number | null {
   const limit = Number(creditLimit)
   if (!Number.isFinite(limit) || limit === 0) return null
-  const balance = Number(currentBalance) || 0
-  return balance / limit
+  // Credit balances are negative when money is owed (-200 = 200 owed), so owed = -balance.
+  const owed = -(Number(currentBalance) || 0)
+  return owed / limit
 }
 
 function creditUtilization(a: AccountResponse): number | null {
@@ -599,6 +600,9 @@ async function confirmDeleteAccount(hide: (trigger?: string) => void) {
                 required
                 class="form-control"
               />
+              <div v-if="form.type === 'CREDIT'" class="form-text">
+                Enter the amount owed as a negative number (e.g. -200 = you owe 200).
+              </div>
             </BFormGroup>
             <BFormGroup
               v-if="form.type === 'CREDIT'"

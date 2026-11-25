@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { listTransactions, createTransaction, deleteTransaction } from '@/api/transactions'
 import { listAccounts } from '@/api/accounts'
 import { listCategories } from '@/api/categories'
@@ -15,13 +15,16 @@ import {
   BModal,
 } from 'bootstrap-vue-next'
 
+type TxnKind = 'EXPENSE' | 'INCOME'
+
 function newTxnForm() {
   return {
     accountId: '',
     categoryId: '',
     transactionDate: new Date().toISOString().slice(0, 10),
+    kind: 'EXPENSE' as TxnKind,
+    /** Entered as a positive number; the sign comes from `kind`. */
     amount: 0,
-    currency: 'USD',
     description: '',
     status: 'POSTED' as TxnStatus,
     merchant: '',
@@ -43,6 +46,11 @@ const submitting = ref(false)
 const deleting = ref(false)
 const showDeleteModal = ref(false)
 const pendingDeleteId = ref<string | null>(null)
+
+/** Transactions always use the selected account's currency (the API rejects a mismatch). */
+const formCurrency = computed(
+  () => accounts.value.find((a) => a.id === form.value.accountId)?.currency ?? '',
+)
 
 async function loadAccountsAndCategories() {
   try {
@@ -96,6 +104,11 @@ async function submitTxn() {
     error.value = 'Select an account'
     return
   }
+  const magnitude = Math.abs(Number(form.value.amount) || 0)
+  if (magnitude === 0) {
+    error.value = 'Amount must be greater than 0'
+    return
+  }
   submitting.value = true
   error.value = ''
   try {
@@ -103,8 +116,8 @@ async function submitTxn() {
       accountId: form.value.accountId,
       categoryId: form.value.categoryId || undefined,
       transactionDate: form.value.transactionDate,
-      amount: form.value.amount,
-      currency: form.value.currency,
+      amount: form.value.kind === 'EXPENSE' ? -magnitude : magnitude,
+      currency: formCurrency.value,
       description: form.value.description,
       status: form.value.status,
       merchant: form.value.merchant || undefined,
@@ -287,18 +300,50 @@ async function confirmDelete(hide: (trigger?: string) => void) {
                 class="form-control"
               />
             </BFormGroup>
-            <BFormGroup label="Amount *" label-for="txn-amount" class="mb-3">
-              <input
-                id="txn-amount"
-                v-model.number="form.amount"
-                type="number"
-                step="0.01"
-                required
-                class="form-control"
-              />
+            <BFormGroup label="Type" class="mb-3">
+              <div class="btn-group w-100" role="group" aria-label="Transaction type">
+                <input
+                  id="txn-kind-expense"
+                  v-model="form.kind"
+                  type="radio"
+                  class="btn-check"
+                  value="EXPENSE"
+                  autocomplete="off"
+                />
+                <label class="btn btn-outline-danger" for="txn-kind-expense">Expense</label>
+                <input
+                  id="txn-kind-income"
+                  v-model="form.kind"
+                  type="radio"
+                  class="btn-check"
+                  value="INCOME"
+                  autocomplete="off"
+                />
+                <label class="btn btn-outline-success" for="txn-kind-income">Income / refund</label>
+              </div>
             </BFormGroup>
-            <BFormGroup label="Currency (3 letters) *" label-for="txn-currency" class="mb-3">
-              <BFormInput id="txn-currency" v-model="form.currency" maxlength="3" required />
+            <BFormGroup
+              label="Amount *"
+              label-for="txn-amount"
+              class="mb-3"
+              :description="
+                form.kind === 'EXPENSE'
+                  ? 'Decreases the account balance when posted.'
+                  : 'Increases the account balance when posted.'
+              "
+            >
+              <div class="input-group">
+                <input
+                  id="txn-amount"
+                  v-model.number="form.amount"
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  class="form-control"
+                />
+                <span v-if="formCurrency" class="input-group-text">{{ formCurrency }}</span>
+              </div>
             </BFormGroup>
             <BFormGroup label="Description *" label-for="txn-description" class="mb-3">
               <BFormInput id="txn-description" v-model="form.description" required />
@@ -308,6 +353,7 @@ async function confirmDelete(hide: (trigger?: string) => void) {
                 <option value="PENDING">Pending</option>
                 <option value="POSTED">Posted</option>
               </select>
+              <div class="form-text">Only posted transactions change the account balance.</div>
             </BFormGroup>
             <BFormGroup label="Merchant" label-for="txn-merchant" class="mb-3">
               <BFormInput id="txn-merchant" v-model="form.merchant" />
