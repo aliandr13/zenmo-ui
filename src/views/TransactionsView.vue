@@ -351,18 +351,34 @@ async function confirmDelete(hide: (trigger?: string) => void) {
                 <span v-if="formCurrency" class="input-group-text">{{ formCurrency }}</span>
               </div>
             </BFormGroup>
-            <BFormGroup label="Description" label-for="txn-description" class="mb-3">
-              <BFormInput id="txn-description" v-model="form.description" />
-            </BFormGroup>
-            <BFormGroup label="Status" label-for="txn-status" class="mb-3">
-              <select id="txn-status" v-model="form.status" class="form-select">
-                <option value="PENDING">Pending</option>
-                <option value="POSTED">Posted</option>
-              </select>
+            <BFormGroup label="Status" class="mb-3">
+              <div class="btn-group w-100" role="group" aria-label="Transaction status">
+                <input
+                  id="txn-status-posted"
+                  v-model="form.status"
+                  type="radio"
+                  class="btn-check"
+                  value="POSTED"
+                  autocomplete="off"
+                />
+                <label class="btn btn-outline-success" for="txn-status-posted">Posted</label>
+                <input
+                  id="txn-status-pending"
+                  v-model="form.status"
+                  type="radio"
+                  class="btn-check"
+                  value="PENDING"
+                  autocomplete="off"
+                />
+                <label class="btn btn-outline-warning" for="txn-status-pending">Pending</label>
+              </div>
               <div class="form-text">Only posted transactions change the account balance.</div>
             </BFormGroup>
             <BFormGroup label="Merchant" label-for="txn-merchant" class="mb-3">
               <BFormInput id="txn-merchant" v-model="form.merchant" />
+            </BFormGroup>
+            <BFormGroup label="Description" label-for="txn-description" class="mb-3">
+              <BFormInput id="txn-description" v-model="form.description" />
             </BFormGroup>
             <div class="d-flex gap-2 transaction-form-actions">
               <BButton type="submit" variant="primary" :disabled="submitting">
