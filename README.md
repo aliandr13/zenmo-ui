@@ -4,6 +4,8 @@ Vue 3 front-end for [Zenmo](https://github.com/aliandr13/zenmo) — spending and
 
 ## Setup
 
+Requires **Node.js `^22.22.0` or `>=24.11.0`** (see `engines` in `package.json`; Vite 8 and Vue Router 5's tooling need it).
+
 1. **Install dependencies**
 
    ```bash
@@ -35,7 +37,7 @@ npm run preview   # preview production build
 
 ## Docker
 
-The `Dockerfile` is a two-stage build: **Node 22** runs `npm ci` and `npm run build`; **Caddy 2** serves the static `dist` output from `/srv` with SPA routing (`try_files` → `index.html`), `encode gzip`, cache headers for common static extensions, and **reverse-proxies `/api/*`** to the Compose service `api:8080` so the browser can use one origin.
+The `Dockerfile` is a two-stage build: **Node 22.23** (`node:22.23-alpine`) runs `npm ci` and `npm run build`; **Caddy 2** serves the static `dist` output from `/srv` with SPA routing (`try_files` → `index.html`), `encode gzip`, cache headers for common static extensions, and **reverse-proxies `/api/*`** to the Compose service `api:8080` so the browser can use one origin.
 
 - Default config ([`caddy/Caddyfile`](caddy/Caddyfile)): **HTTP on port 80** only (good for local Compose).
 - Production example ([`caddy/Caddyfile.production`](caddy/Caddyfile.production)): **HTTPS** for `zenmo.fyi` with **Let’s Encrypt** (automatic). Mount it over `/etc/caddy/Caddyfile` on the container, publish **443**, open firewall **80** and **443**, and set **`CADDY_ACME_EMAIL`** for ACME account contact (recommended). Certificate and renewal state persist in Caddy’s **`/data`** volume (the root [`docker-compose.yml`](../docker-compose.yml) mounts **`caddy_data`** there).
