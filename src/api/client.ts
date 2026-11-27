@@ -11,18 +11,29 @@ const baseUrlLabel = baseUrl === '' ? 'same origin (/api)' : baseUrl
 
 export type RequestInitWithAuth = RequestInit & { skipAuth?: boolean }
 
+/**
+ * Access token lives in memory only. The refresh token is an HttpOnly cookie set by the API
+ * (scoped to /api/auth) — JavaScript never sees or stores it, so a reload restores the session via
+ * a cookie-based refresh instead of reading anything from localStorage.
+ */
 let accessToken: string | null = null
-let refreshToken: string | null = null
 let refreshPromise: Promise<string> | null = null
+let onAuthFailure: (() => void) | null = null
 
-export function setTokens(access: string, refresh: string) {
+/** The refresh token is invalid, expired or revoked: the user must log in again. */
+export class AuthExpiredError extends Error {
+  constructor(message = 'Session expired') {
+    super(message)
+    this.name = 'AuthExpiredError'
+  }
+}
+
+export function setAccessToken(access: string) {
   accessToken = access
-  refreshToken = refresh
 }
 
 export function clearTokens() {
   accessToken = null
-  refreshToken = null
   refreshPromise = null
 }
 
@@ -30,27 +41,39 @@ export function getAccessToken(): string | null {
   return accessToken
 }
 
-function doRefresh(): Promise<string> {
-  if (!refreshToken) return Promise.reject(new Error('No refresh token'))
-  return fetch(`${baseUrl}/api/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refreshToken }),
-  }).then(async (res) => {
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}))
-      throw new Error(err.message || 'Refresh failed')
-    }
-    const data = await res.json()
-    accessToken = data.accessToken
-    if (data.refreshToken) refreshToken = data.refreshToken
-    return data.accessToken
-  })
+/** Called when a request fails because the session can no longer be refreshed. */
+export function setAuthFailureHandler(handler: () => void) {
+  onAuthFailure = handler
 }
 
-function refreshAccessToken(): Promise<string> {
+async function doRefresh(): Promise<string> {
+  // Network errors propagate as-is (TypeError): the session may still be valid, so keep it.
+  const res = await fetch(`${baseUrl}/api/auth/refresh`, { method: 'POST', credentials: 'include' })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    if (res.status === 400 || res.status === 401) throw new AuthExpiredError(err.message)
+    throw new Error(err.message || `Refresh failed (HTTP ${res.status})`)
+  }
+  const data = await res.json()
+  accessToken = data.accessToken
+  return data.accessToken
+}
+
+/** Single-flight: parallel 401s share one refresh call (the refresh token rotates on every use). */
+export function refreshAccessToken(): Promise<string> {
   if (!refreshPromise) refreshPromise = doRefresh().finally(() => { refreshPromise = null })
   return refreshPromise
+}
+
+/** Revokes the refresh token on the server and clears the cookie. Best effort. */
+export async function logoutSession(): Promise<void> {
+  try {
+    await fetch(`${baseUrl}/api/auth/logout`, { method: 'POST', credentials: 'include' })
+  } catch {
+    /* offline: the cookie stays until it expires; the in-memory token is cleared anyway */
+  } finally {
+    clearTokens()
+  }
 }
 
 export async function apiFetch(path: string, init: RequestInitWithAuth = {}): Promise<Response> {
@@ -63,7 +86,8 @@ export async function apiFetch(path: string, init: RequestInitWithAuth = {}): Pr
     if (!headers.has('Content-Type') && opts.body && typeof opts.body === 'string') {
       headers.set('Content-Type', 'application/json')
     }
-    return fetch(url, { ...opts, headers })
+    // 'include' so the browser stores/sends the refresh cookie on /api/auth/* (also cross-origin in dev)
+    return fetch(url, { credentials: 'include', ...opts, headers })
   }
 
   let res = await doRequest(skipAuth ? null : accessToken)
@@ -72,9 +96,11 @@ export async function apiFetch(path: string, init: RequestInitWithAuth = {}): Pr
     try {
       const newAccess = await refreshAccessToken()
       res = await doRequest(newAccess)
-    } catch {
+    } catch (e) {
+      if (!(e instanceof AuthExpiredError)) throw e
       clearTokens()
-      return new Response(JSON.stringify({ message: 'Unauthorized' }), { status: 401 })
+      onAuthFailure?.()
+      return new Response(JSON.stringify({ message: 'Session expired. Please log in again.' }), { status: 401 })
     }
   }
 

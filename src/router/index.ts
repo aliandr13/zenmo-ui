@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { getAccessToken, setAuthFailureHandler } from '@/api/client'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,28 +31,30 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach(async (to, _from, next) => {
+router.beforeEach(async (to) => {
+  if (to.meta.public || !to.meta.requiresAuth) return true
+
   const auth = useAuthStore()
-  if (to.meta.public) {
-    next()
-    return
-  }
-  if (to.meta.requiresAuth) {
-    const token = (await import('@/api/client')).getAccessToken()
-    if (!token) {
-      next({ name: 'Login', query: { redirect: to.fullPath } })
-      return
+  const toLogin = { name: 'Login', query: { redirect: to.fullPath } }
+  try {
+    // No access token in memory (first load / page reload): try the HttpOnly refresh cookie.
+    if (!getAccessToken()) {
+      return (await auth.restoreSession()) ? true : toLogin
     }
-    if (!auth.user) {
-      try {
-        await auth.fetchUser()
-      } catch {
-        next({ name: 'Login', query: { redirect: to.fullPath } })
-        return
-      }
-    }
+    if (!auth.user) await auth.fetchUser()
+    return true
+  } catch {
+    return toLogin
   }
-  next()
+})
+
+// A request failed because the session could not be refreshed: drop local state and go to login.
+setAuthFailureHandler(() => {
+  useAuthStore().sessionExpired()
+  const current = router.currentRoute.value
+  if (!current.meta.public) {
+    router.push({ name: 'Login', query: { redirect: current.fullPath } })
+  }
 })
 
 export default router

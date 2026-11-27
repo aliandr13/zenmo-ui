@@ -18,8 +18,8 @@ const router = useRouter()
 const auth = useAuthStore()
 const themeStore = useThemeStore()
 
-function logout() {
-  auth.logout()
+async function logout() {
+  await auth.logout()
   router.push({ name: 'Login' })
 }
 
