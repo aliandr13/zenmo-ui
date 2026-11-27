@@ -2,6 +2,15 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { getAccessToken, setAuthFailureHandler } from '@/api/client'
 
+declare module 'vue-router' {
+  interface RouteMeta {
+    /** Reachable without a session (login, register). */
+    public?: boolean
+    /** Needs a session; the guard restores it from the refresh cookie or redirects to login. */
+    requiresAuth?: boolean
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
