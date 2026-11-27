@@ -101,4 +101,5 @@ docker run --rm -p 3000:80 ghcr.io/<owner>/zenmo-ui:latest
 - Vite
 - Vue Router (auth guard for protected routes)
 - Pinia (auth store)
-- API client with token refresh on 401
+- API client with token refresh on 401: the access token is kept in memory only; the refresh token is an HttpOnly
+  cookie set by the API (never readable by JavaScript), so the session survives page reloads

@@ -17,14 +17,6 @@ export function login(body: LoginRequest): Promise<TokensResponse> {
   })
 }
 
-export function refresh(refreshToken: string): Promise<TokensResponse> {
-  return apiJson<TokensResponse>('/api/auth/refresh', {
-    method: 'POST',
-    body: JSON.stringify({ refreshToken }),
-    skipAuth: true,
-  })
-}
-
 export function me(): Promise<CurrentUser> {
   return apiJson<CurrentUser>('/api/auth/me')
 }
