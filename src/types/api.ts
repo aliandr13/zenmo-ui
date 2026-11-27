@@ -72,10 +72,9 @@ export interface TxnRequest {
   postDate?: string
   amount: number
   currency: string
-  description: string
+  description?: string
   merchant?: string
   status: TxnStatus
-  notes?: string
 }
 
 export interface TxnResponse {
@@ -86,10 +85,9 @@ export interface TxnResponse {
   postDate?: string
   amount: number
   currency: string
-  description: string
+  description?: string
   merchant?: string
   status: TxnStatus
-  notes?: string
   createdAt: string
 }
 
