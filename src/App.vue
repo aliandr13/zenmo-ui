@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { BModalOrchestrator, BToastOrchestrator, BPopoverOrchestrator } from 'bootstrap-vue-next'
+import { BApp } from 'bootstrap-vue-next'
 </script>
 
 <template>
-  <BModalOrchestrator />
-  <BToastOrchestrator />
-  <BPopoverOrchestrator />
-  <router-view />
+  <BApp>
+    <router-view />
+  </BApp>
 </template>
 
 <style>
